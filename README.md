@@ -1,0 +1,110 @@
+# Singular-Sensitivity Measure Operators (SSMO)
+
+This repository implements the first executable stages of the supplied
+[proposal](docs/PROPOSAL.md). It studies the scalar Burgers entropy solution
+`u_t + (u²/2)_x = 0` on `[-2,2]`, with constant exterior states and observation
+times before boundary interaction. A directional sensitivity is a **signed**
+measure: a diffuse density plus atoms `(u_left-u_right) Ds[v]` at continuous
+shock positions. Atomic masses are evaluated directly against smooth queries.
+
+The implemented learned experiment receives initial-data coefficients and time.
+It predicts a one-front state chart; chart JVPs and explicit moving-boundary
+assembly supply its derivative. It uses a small eager FP32 MLP, with exact FP64
+references and tests. Learned multi-front architectures, numerical-label
+training, systems, higher dimensions, and efficacy claims are gated extensions.
+
+## What runs
+
+| Stage | Purpose | Default budget |
+|---|---|---|
+| Mathematical audit | Signs, query normalization, nonlinear payoff jumps, collision derivatives, mixed weight/parameter gradients, checkpoint recovery | CPU, small FP64 cases |
+| Compact data manifest | Disjoint physical parents; all times, directions, queries and grids share their parent's split | Smoke: 24/8/8 train/validation/test, 4 range holdouts |
+| Representation study | Measure pairings versus grid FD and fixed physical smoothing ladders | CPU, short bounded ladders |
+| Numerical teacher audit | Conservative Godunov refinement and coupled FD error records | CPU, 128/256/512 cells |
+| Learned chart smoke | Exercise actual gradient-bearing training, validation selection, logs and checkpoints | 20 updates, one seed, width 32 |
+| Pilot | Match state-only and measure-training controls, separately per seed/hardware | 500 updates, width 64; explicit submission |
+| Evaluation/inverse | Raw held-out query errors, parent-level statistics, classical/grid controls, BL LP diagnostics and trusted objective checks | Bounded parent and LP counts |
+
+Neither a successful smoke nor an analytic toy comparison establishes a
+learning advantage. The classical polynomial front control contains the exact
+single-shock dynamics and should be extremely accurate. Costs include reference
+generation, fitting/training, state/support reconstruction, directions and queries.
+Different fitting and supervision costs are disclosed. GPU models remain separate
+measurement strata.
+
+## Local CPU workflow
+
+Python 3.11 or 3.12 and a project-local `.venv` are required. Use
+`bash scripts/setup_local.sh` for the pinned CPU environment. It confines caches
+and temporary files to this project and refuses heavy installation on a CARC
+login node. No Conda environment is used.
+
+```bash
+cd /absolute/path/to/SSMO
+bash scripts/setup_local.sh
+export SSMO_ROOT="$PWD"
+source scripts/carc_env.sh
+ssmo_env
+export SSMO_PROJECT_ROOT="$SSMO_ROOT"
+
+# Select a fresh, project-local directory for each study.
+RUN="$SSMO_ROOT/runs/local-smoke-001"
+mkdir -p "$RUN"
+"$SSMO_ROOT/.venv/bin/python" -m singular_sensitivity.cli plan --config configs/smoke.yaml
+"$SSMO_ROOT/.venv/bin/python" -m singular_sensitivity.cli audit --config configs/smoke.yaml --run-dir "$RUN/audit"
+"$SSMO_ROOT/.venv/bin/python" -m singular_sensitivity.cli generate --config configs/smoke.yaml --run-dir "$RUN/data"
+"$SSMO_ROOT/.venv/bin/python" -m singular_sensitivity.cli representation --config configs/smoke.yaml --run-dir "$RUN/representation"
+"$SSMO_ROOT/.venv/bin/python" -m singular_sensitivity.cli numerical --config configs/smoke.yaml --run-dir "$RUN/numerical"
+"$SSMO_ROOT/.venv/bin/python" -m singular_sensitivity.cli train --config configs/smoke.yaml --run-dir "$RUN/measure" --manifest "$RUN/data/parents.json" --method measure --seed 17
+"$SSMO_ROOT/.venv/bin/python" -m singular_sensitivity.cli train --config configs/smoke.yaml --run-dir "$RUN/state-only" --manifest "$RUN/data/parents.json" --method state_only --seed 17
+"$SSMO_ROOT/.venv/bin/python" -m singular_sensitivity.cli evaluate --config configs/smoke.yaml --run-dir "$RUN/evaluate-measure" --manifest "$RUN/data/parents.json" --checkpoint "$RUN/measure/best.pt"
+"$SSMO_ROOT/.venv/bin/python" -m singular_sensitivity.cli evaluate --config configs/smoke.yaml --run-dir "$RUN/evaluate-state-only" --manifest "$RUN/data/parents.json" --checkpoint "$RUN/state-only/best.pt"
+"$SSMO_ROOT/.venv/bin/python" -m singular_sensitivity.cli inverse --config configs/smoke.yaml --run-dir "$RUN/inverse" --checkpoint "$RUN/measure/best.pt"
+"$SSMO_ROOT/.venv/bin/python" -m singular_sensitivity.cli report --config configs/smoke.yaml --run-dir "$RUN"
+```
+
+For CARC use the [inline runbook](docs/CARC_RUNBOOK.md), which contains discovery,
+resource budgets, dry-run previews, explicit submissions and recovery commands.
+Every allocation charges `anakano_81`; project storage is
+`/home1/aadaniel/projects/SSMO`. CPU stages use `main`; GPU stages use `gpu`.
+A100 40 GB, A40, A30, L40 and L40S are separate profiles. Only currently observed
+GRES/feature labels may be submitted. Runtime audits execute CUDA kernels and
+mixed-derivative backward work in the allocated task and enforce the 80% measured
+reserved-VRAM budget. Host `--mem` is recorded separately.
+
+## Scientific and artifact contract
+
+Physical parents are the independent split/statistical units. Training reads
+only train and validation examples. Validation queries differ from the training
+bank and the test bank; one globally selected validation checkpoint answers all
+test objectives. Compact manifests hold initial-data parameters, not dense
+trajectories, future event labels or teacher supports. Exact and numerical labels
+remain separate from model inputs.
+
+Exact shock, rarefaction, constant and two-shock collision references are
+implemented. At an exact collision the derivative is conservatively **unresolved**
+until its one-sided weak limits have been established; calling a pairing raises.
+Near-event results retain their status and event distance. No clipping converts
+grazing events into regular gradients. The event/reset calculus is an explicitly
+scoped finite-dimensional calculation.
+
+Linear queries use diffuse integrals and atom evaluations. A squared tracking
+objective uses the jump in `0.5*(u-target)²`, rather than an arbitrary trace
+multiplied by an atom. Query normalization bounds amplitude and Lipschitz constant
+in the nondimensional coordinate `(x+2)/4`. LP diagnostics describe the discrete
+signed measure and carry solver residuals and diffuse discretization bounds;
+they are not rigorous PDE certificates.
+
+Important outputs are immutable parent manifests; raw per-query reference,
+prediction and error records; FD/refinement ladders; event statuses; parent-level
+quantiles and maxima; training JSONL; software/config/source hashes; actual
+hardware and memory observations; and selected/last/previous checkpoints.
+Resume restores optimizer and RNG/sampler state, preserves the direction
+convention, and rejects changed configuration or parent manifests. A paused
+training stage exits nonzero so `afterok` cannot start its dependents. No Slurm
+advance signal is requested until delivery has been tested in an allocation.
+
+See [scope and gates](docs/SCIENCE_SCOPE.md) and the current
+[validation record](docs/VALIDATION.md). This cloud workspace supplies CPU
+validation and prepared Slurm scripts; it does not itself establish CARC access,
+account authorization, GPU operation, or publication-ready research results.

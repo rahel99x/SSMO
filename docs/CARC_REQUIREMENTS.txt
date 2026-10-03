@@ -1,0 +1,120 @@
+Prepare PROJECT_NAME to run on USC CARC using the requirements below.
+Inspect this project's code and requirements before choosing its workflow.
+
+Identity and storage
+- CARC username: aadaniel.
+- Charge every allocation explicitly to anakano_81 using
+  --account=anakano_81. Do not rely on the user's default account.
+- Project root: /home1/aadaniel/projects/PROJECT_NAME.
+- Keep all project files, the venv, dependencies, temporary files,
+  caches, datasets, logs, reports and checkpoints inside this root.
+- Do not use /tmp or /scratch1. Reject output paths and symlinks
+  that escape the project root.
+
+Previously observed environment — verify before relying on it
+- CPU partition: main. Select it explicitly rather than automatically
+  choosing a specialized partition such as htcondor.
+- GPU partition: gpu.
+- Available Python module: python/3.11.9.
+- An allocated A100-PCIE-40GB reported 40960 MiB and NVIDIA driver
+  580.159.04.
+- PyTorch 2.10.0+cu126 from
+  https://download.pytorch.org/whl/cu126 was selected for TDN.
+  Use it only if compatible with this project's dependencies.
+- The driver audit did not execute CUDA kernels or validate performance.
+  Verify CUDA operation in an actual allocated GPU task.
+
+Discover current CARC policy
+- Check identity, quota, account associations, partitions, node features,
+  resource limits and available modules.
+- Useful commands:
+    id -un
+    myaccount
+    myquota
+    sacctmgr -nP show associations where user=aadaniel account=anakano_81 \
+      format=Account,User,Partition,QOS,MaxWall,GrpTRES
+    sinfo -h -o '%P|%a|%G|%l|%c|%m'
+    sinfo -p gpu -N -h -o '%N|%G|%f|%m|%c'
+    scontrol show partition main
+    scontrol show partition gpu
+    module avail python
+- A visible partition does not establish account authorization.
+  Recheck relevant account, partition and QoS limits before submission.
+
+Python and shell setup
+- Use standalone Python and a project-local .venv; never Conda.
+- Load the selected Python module inside jobs as well as during setup.
+- Create the environment with python3 -m venv.
+- Invoke the project's .venv/bin/python explicitly.
+- Perform substantial dependency installation in a CPU allocation.
+- Pin compatible dependencies, run pip check, and record installed
+  versions and the dependency freeze.
+- Before installation or Python execution, redirect TMPDIR/TMP/TEMP,
+  pip, XDG, PyTorch, compiler, Triton, extension, Matplotlib, CUDA and
+  bytecode caches into the project. Give pytest a project-local basetemp.
+- Keep strict mode inside executable Bash scripts. A sourced helper
+  must preserve the login shell's options and return errors without
+  terminating the interactive shell.
+
+Allocations
+- Use the login node for lightweight inspection, editing, submission
+  and monitoring.
+- Run tests, substantial installation, data generation, training and
+  benchmarks through Slurm allocations and srun tasks.
+- Use CPU allocations for stages that do not benefit from a GPU.
+- For the previously verified A100 40 GB target, request:
+    --partition=gpu
+    --gpus-per-task=a100:1
+    --constraint=a100-40gb
+- Choose CPUs, host RAM and walltime for each stage from this project's
+  workload and a small calibration run. Do not copy TDN's sizes blindly.
+- Host --mem is separate from GPU VRAM.
+- Preserve Slurm's CUDA_VISIBLE_DEVICES. With one task-visible GPU,
+  use cuda:0 and run hardware checks and computation in the same task.
+- Match thread and worker counts to the allocation.
+
+Execution and dependencies
+- Start with a small end-to-end smoke run, then validate the requested
+  hardware and measure memory/runtime before expanding.
+- Provide a dry-run allocation preview and an explicit submission mode.
+- Capture real job IDs from sbatch --parsable and save them.
+- Use --dependency=afterok:JOB_ID for stages requiring successful
+  predecessor completion. Submit independent work independently.
+- Create log directories before sbatch and pass absolute paths.
+  Do not expect shell variables in #SBATCH directives to expand.
+- Preserve project-specific accuracy, validation and scientific gates.
+  TDN's gates and optimizer-step limits are not universal CARC rules.
+
+Concurrent projects and recovery
+- Give each project its own venv, caches, scripts and run directories.
+- Use unique project-prefixed job names and fresh run identifiers.
+- Record each run's job IDs, configuration, source revision and software
+  environment. Keep queued and running jobs on a stable source snapshot.
+- Check existing jobs and shared account limits before adding work.
+  Bound concurrency rather than submitting an unlimited campaign.
+- Never cancel another project's jobs or use scancel -u aadaniel.
+- Preserve completed and failed results.
+- Implement checkpoint/resume where useful. Request advance signals
+  only when the application has a working signal handler.
+- A failed or paused predecessor does not satisfy afterok. On deliberate
+  resume, rebuild downstream dependencies using the new job ID.
+
+Monitoring and reporting
+- Monitor the queue with:
+    squeue -u aadaniel -o "%.18i %.30j %.12T %.10M %.35R"
+- Inspect this run's recorded job IDs with:
+    sacct -j JOB_IDS \
+      --format=JobID,JobName,Account,State,Elapsed,AllocTRES,MaxRSS,ExitCode
+- Check the parent job's state and exit code, plus relevant task logs.
+- Report GPU memory from application measurements; MaxRSS is host RAM.
+- Distinguish prepared scripts, dry runs, CPU validation, driver
+  observations and actual GPU execution.
+
+Deliverables and access
+- Provide the necessary Bash setup scripts, Slurm task scripts,
+  submission/dependency wrapper, resource table and inline runbook.
+- First determine whether this chat actually has CARC access.
+  If it does not, prepare the repository and exact commands for me
+  to run, then interpret returned output. Do not claim jobs ran.
+- Preparing this workflow does not itself authorize live submissions;
+  follow the execution scope I specify in this project chat.

@@ -1,0 +1,39 @@
+schema_version: 1
+name: carc-bounded-pilot
+domain: [-2.0, 2.0]
+device: cuda:0
+precision: fp32
+compile: false
+threads: 2
+data:
+  seed: 1729
+  train_parents: 512
+  validation_parents: 64
+  test_parents: 64
+  ood_parents: 32
+  times: [0.15, 0.4, 0.65]
+training:
+  seeds: [17, 29, 43]
+  steps: 500
+  batch_size: 32
+  directions_per_parent: 3
+  lr: 0.001
+  width: 64
+  depth: 3
+  eval_every: 25
+  patience: 6
+  min_delta: 0.000001
+  checkpoint_every: 50
+  max_seconds: 1200
+  loss_weights: {weak: 1.0, state: 1.0, support: 0.1, weights: 0.1, tv: 0.000001}
+evaluation:
+  max_parents: 64
+  lp_parents: 4
+  resolutions: [32, 64, 128, 256]
+  fd_steps: [0.01, 0.001, 0.0001, 0.00001]
+  query_chunk_size: 8
+  timing_repeats: 5
+  warmup: 2
+  absolute_tolerance: 0.01
+  relative_floor: 0.01
+inverse: {steps: 16, lr: 0.1}
