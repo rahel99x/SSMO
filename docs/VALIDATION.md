@@ -192,3 +192,20 @@ unchanged read-only source copy under
 code was recorded as zero and source hashes were rechecked. Mocked Slurm and
 POSIX lock checks do not establish successful execution on the CARC filesystem;
 the runbook provides a fresh smoke submission that preserves the failed run.
+
+## User-reported CARC smoke and pilot
+
+The user's subsequent accounting rows report all six `ssmo-smoke-002` stages
+completed with exit code `0:0`, including validation after the shared-lock fix.
+Their one-GPU audit/training/evaluation allocations total 45 seconds. All eight
+`ssmo-pilot-001` stages also completed with exit code `0:0`; its five one-GPU
+allocations total 221 seconds. These are user-supplied CARC observations, not
+cloud-executed jobs or independent access to the remote filesystem.
+
+Extracted pilot summaries show measure training passing 61/62 supported parents,
+state-only passing 32/62, and classical front regression passing 62/62. Measure
+training's fixed shock error `0.01181978014` exceeds the unchanged `0.01` tolerance.
+The complete scientific accuracy gate remains unmet despite successful execution.
+See [CARC_PILOT_ASSESSMENT.md](CARC_PILOT_ASSESSMENT.md) for cohort counts, costs,
+early stopping, reported memory and evidence limits. No preset, tolerance or
+scientific implementation was changed in response to these sealed results.
