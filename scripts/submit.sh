@@ -17,8 +17,6 @@ skip_install=0
 method=measure
 seed=17
 discovery=
-max_project_jobs=8
-account_slots=
 free_cpus=
 free_mem=
 free_gpus=
@@ -29,10 +27,10 @@ Usage: scripts/submit.sh [--config PATH] [--run-id ID] [--submit]
   [--pipeline setup|smoke|pilot | --stage install|validate|data|gpu-smoke|train|evaluate|report]
   [--gpu-profile a10040|a40|a30|l40|l40s|cpu] [--method measure|state_only] [--seed N]
   [--after JOBID] [--resume CHECKPOINT] [--manifest PATH] [--checkpoint PATH]
-  [--discovery ID] [--python-module python/VERSION] [--max-project-jobs N]
+  [--discovery ID] [--python-module python/VERSION]
   [--skip-install] [--report-from ARTIFACT_DIRECTORY]
 Live submissions require reviewed current account free capacity:
-  --account-slots N --account-free-cpus N --account-free-mem-gb N --account-free-gpus N
+  --account-free-cpus N --account-free-mem-gb N --account-free-gpus N
 Dry-run is the default and does not create directories or submit jobs.
 USAGE
 }
@@ -42,7 +40,7 @@ while (( $# )); do
         --submit) submit=1; shift; continue ;;
         --dry-run) submit=0; shift; continue ;;
         --skip-install) skip_install=1; shift; continue ;;
-        --config|--run-id|--pipeline|--stage|--gpu-profile|--method|--seed|--after|--resume|--manifest|--checkpoint|--report-from|--discovery|--python-module|--max-project-jobs|--account-slots|--account-free-cpus|--account-free-mem-gb|--account-free-gpus)
+        --config|--run-id|--pipeline|--stage|--gpu-profile|--method|--seed|--after|--resume|--manifest|--checkpoint|--report-from|--discovery|--python-module|--account-free-cpus|--account-free-mem-gb|--account-free-gpus)
             (( $# >= 2 )) || { ssmo_error "missing value for $1"; exit 2; }
             flag=$1 value=$2
             case "$flag" in
@@ -52,7 +50,6 @@ while (( $# )); do
                 --manifest) manifest=$value ;; --checkpoint) checkpoint=$value ;;
                 --report-from) report_source=$value ;;
                 --discovery) discovery=$value ;; --python-module) python_module=$value ;;
-                --max-project-jobs) max_project_jobs=$value ;; --account-slots) account_slots=$value ;;
                 --account-free-cpus) free_cpus=$value ;; --account-free-mem-gb) free_mem=$value ;;
                 --account-free-gpus) free_gpus=$value ;;
             esac
@@ -63,7 +60,7 @@ done
 [[ "$run_id" =~ ^[A-Za-z0-9][A-Za-z0-9_-]{0,79}$ ]] || { ssmo_error 'invalid run ID'; exit 2; }
 [[ "$pipeline" = setup || "$pipeline" = smoke || "$pipeline" = pilot ]] || { ssmo_error 'pipeline must be setup, smoke or pilot'; exit 2; }
 [[ "$method" = measure || "$method" = state_only ]] || { ssmo_error 'invalid method'; exit 2; }
-[[ "$seed" =~ ^[0-9]+$ && "$max_project_jobs" =~ ^[1-9][0-9]*$ ]] || { ssmo_error 'invalid seed/job bound'; exit 2; }
+[[ "$seed" =~ ^[0-9]+$ ]] || { ssmo_error 'invalid seed'; exit 2; }
 [[ -z "$after" || "$after" =~ ^[0-9]+$ ]] || { ssmo_error 'after must be one real job ID'; exit 2; }
 [[ "$python_module" =~ ^python/[A-Za-z0-9._+-]+$ ]] || { ssmo_error 'invalid Python module'; exit 2; }
 case "$profile" in a10040|a40|a30|l40|l40s|cpu) ;; *) ssmo_error 'unknown GPU profile'; exit 2 ;; esac
@@ -112,9 +109,6 @@ else
         stages+=(report); methods+=(measure)
     fi
 fi
-num_stages=${#stages[@]}
-(( num_stages <= max_project_jobs )) || { ssmo_error "pipeline has $num_stages jobs; max-project-jobs=$max_project_jobs"; exit 2; }
-
 # Conservative budgets; application measurements must precede larger campaigns.
 resources() {
     case "$1" in
@@ -151,10 +145,9 @@ if (( submit )); then
     [[ -s "$discovery_dir/associations.txt" ]] || { ssmo_error 'account association missing'; exit 2; }
     grep -Eq 'anakano_81\|aadaniel\|' "$discovery_dir/associations.txt" || { ssmo_error 'account/user association not found'; exit 2; }
     grep -Fq -- "$python_module" "$discovery_dir/modules.txt" || { ssmo_error 'selected Python module was not observed'; exit 2; }
-    for capacity in "$account_slots" "$free_cpus" "$free_mem" "$free_gpus"; do
-        [[ "$capacity" =~ ^[0-9]+$ ]] || { ssmo_error 'all four reviewed account capacity flags are required'; exit 2; }
+    for capacity in "$free_cpus" "$free_mem" "$free_gpus"; do
+        [[ "$capacity" =~ ^[0-9]+$ ]] || { ssmo_error 'all three reviewed free-resource flags are required'; exit 2; }
     done
-    (( account_slots >= num_stages )) || { ssmo_error 'reviewed account submission slots are insufficient'; exit 2; }
     peak_cpu=0; peak_mem=0; need_gpu=0
     for stage in "${stages[@]}"; do
         resources "$stage"
@@ -175,10 +168,13 @@ if (( submit )); then
     fi
     current_jobs=$(squeue -h -u aadaniel -o '%i|%j|%T|%a|%C|%m|%b')
     current_account=$(squeue -h -A anakano_81 -o '%i|%u|%j|%T|%C|%m|%b')
-    # Any account queue change invalidates manually reviewed available capacities.
-    [[ "$current_account" = "$(cat "$discovery_dir/account_jobs.txt")" ]] || { ssmo_error 'shared account queue changed; rediscover and review free limits'; exit 2; }
+    # Pending jobs consume no current allocation; other projects may enqueue
+    # while this review is fresh. Changes to allocated/non-PENDING records still
+    # invalidate reviewed free TRES. Stable sorting ignores scheduler row order.
+    current_allocations=$(printf '%s\n' "$current_account" | awk -F'|' 'NF && $4 != "PENDING"' | LC_ALL=C sort)
+    observed_allocations=$(awk -F'|' 'NF && $4 != "PENDING"' "$discovery_dir/account_jobs.txt" | LC_ALL=C sort)
+    [[ "$current_allocations" = "$observed_allocations" ]] || { ssmo_error 'shared account allocations changed; rediscover and review free resources'; exit 2; }
     existing=$(printf '%s\n' "$current_jobs" | awk -F'|' '$2 ~ /^SSMO-/ {n++} END {print n+0}')
-    (( existing + num_stages <= max_project_jobs )) || { ssmo_error 'project pending/running job cap would be exceeded'; exit 2; }
     for stage in "${stages[@]}"; do
         if [[ "$stage" = install ]] && (( existing > 0 )); then
             ssmo_error 'installation must wait until other SSMO queued/running jobs finish'
@@ -222,7 +218,7 @@ if (( submit )); then
         cp -- "$SSMO_PROJECT_ROOT/.venv/ssmo-dependency-freeze.txt" "$run_dir/artifacts/dependency-freeze.txt"
     fi
     cp -a "$discovery_dir" "$run_dir/discovery"
-    printf 'run_id=%s\nssmo_project_root=%s\nconfig=%s\nprofile=%s\npython_module=%s\npipeline=%s\nmax_project_jobs=%s\naccount_slots=%s\nfree_cpus=%s\nfree_mem_gb=%s\nfree_gpus=%s\n' "$run_id" "$SSMO_PROJECT_ROOT" "$config" "$profile" "$python_module" "$pipeline" "$max_project_jobs" "$account_slots" "$free_cpus" "$free_mem" "$free_gpus" > "$run_dir/submission-manifest.txt"
+    printf 'run_id=%s\nssmo_project_root=%s\nconfig=%s\nprofile=%s\npython_module=%s\npipeline=%s\nfree_cpus=%s\nfree_mem_gb=%s\nfree_gpus=%s\n' "$run_id" "$SSMO_PROJECT_ROOT" "$config" "$profile" "$python_module" "$pipeline" "$free_cpus" "$free_mem" "$free_gpus" > "$run_dir/submission-manifest.txt"
     printf 'method=%s\nseed=%s\nmanifest=%s\ncheckpoint=%s\nresume=%s\nreport_source=%s\nskip_install=%s\n' "$method" "$seed" "$manifest" "$checkpoint" "$resume" "$report_source" "$skip_install" >> "$run_dir/submission-manifest.txt"
     chmod -R a-w "$source_dir"
     chmod a-w "$frozen_config"

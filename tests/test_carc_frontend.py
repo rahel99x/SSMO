@@ -75,7 +75,7 @@ printf 'mock complete plan\\n'
                 if line.startswith("submit\t")]
 
     def reviewed_capacity(self):
-        self.env.update(SSMO_ACCOUNT_SLOTS="9", SSMO_ACCOUNT_FREE_CPUS="4",
+        self.env.update(SSMO_ACCOUNT_FREE_CPUS="4",
                         SSMO_ACCOUNT_FREE_MEM_GB="8", SSMO_ACCOUNT_FREE_GPUS="1")
 
     def previous_run(self, name="previous", seed=29):
@@ -131,7 +131,8 @@ printf 'mock complete plan\\n'
         self.assertTrue(lines[0].startswith("discovery --run-id ssmo-policy-"))
         args = self.submitted()[0]
         self.assertEqual(args[args.index("--discovery") + 1], lines[0].split()[-1])
-        self.assertEqual(args[args.index("--account-slots") + 1], "9")
+        self.assertNotIn("--account-slots", args)
+        self.assertNotIn("--max-project-jobs", args)
         self.assertEqual(args[args.index("--account-free-cpus") + 1], "4")
         self.assertEqual(args[args.index("--account-free-mem-gb") + 1], "8")
         self.assertEqual(args[args.index("--account-free-gpus") + 1], "1")
@@ -141,9 +142,19 @@ printf 'mock complete plan\\n'
     def test_unreviewed_capacity_blocks_before_any_writes_or_discovery(self):
         result = self.run_frontend("smoke", "--run-id", "smoke", "--submit")
         self.assertNotEqual(result.returncode, 0)
-        self.assertIn("all four reviewed", result.stderr)
+        self.assertIn("all three reviewed", result.stderr)
         self.assertFalse(self.calls.exists())
         self.assertFalse((self.root / "runs").exists())
+
+    def test_three_resource_values_suffice_and_legacy_count_settings_have_no_effect(self):
+        self.reviewed_capacity()
+        self.env.update(SSMO_ACCOUNT_SLOTS="0", SSMO_MAX_PROJECT_JOBS="1")
+        result = self.run_frontend("pilot", "--run-id", "pilot", "--submit")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        args = self.submitted()[0]
+        self.assertIn("--submit", args)
+        self.assertNotIn("--account-slots", args)
+        self.assertNotIn("--max-project-jobs", args)
 
     def test_discovery_failure_prevents_submission(self):
         self.reviewed_capacity()
@@ -271,7 +282,7 @@ printf 'mock complete plan\\n'
         for command in ("discover", "status"):
             for arguments in (("--submit",), ("--dry-run",), ("--config", "configs/carc_smoke.yaml"),
                               ("--gpu-profile", "a40"), ("--after", "101"), ("--seed", "29"),
-                              ("--account-slots", "9"), ("--method", "measure")):
+                              ("--account-free-cpus", "4"), ("--method", "measure")):
                 with self.subTest(command=command, arguments=arguments):
                     result = self.run_frontend(command, "--run-id", "inspection", *arguments)
                     self.assertNotEqual(result.returncode, 0)

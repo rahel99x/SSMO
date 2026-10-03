@@ -24,6 +24,10 @@ It reads project-local site settings, captures fresh policy for live actions,
 and reuses only a verified Python 3.12.8 CUDA environment. Never guess free
 shared-account capacities. Read docs/CONFIG_TUNING.md before modifying presets;
 selection uses independent validation, with no retuning on sealed test results.
+Do not reintroduce project pending-job caps or manual submission-slot settings.
+Other projects may enqueue concurrently. Preserve the 30-minute maximum GPU
+allocation and three reviewed free CPU/memory/GPU resource values; account queue
+freshness excludes PENDING rows. Keep queued-SSMO protection against venv changes.
 
 Retain signed atoms at continuous coordinates; never multiply an atom by cell
 width or normalize signed masses as probabilities. Nonlinear field objectives

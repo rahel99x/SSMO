@@ -86,6 +86,9 @@ bash scripts/carc.sh pilot --run-id ssmo-pilot-001 --submit
 
 Omit `--submit` to preview. Live actions capture fresh discovery automatically,
 reuse a verified venv, and retain explicit shared-account capacity checks.
+No local pending-job or submission-count limit is imposed. Other projects can
+enqueue concurrently; allocated resource changes require refreshed review.
+GPU jobs retain a maximum 30-minute Slurm limit and bounded application work.
 The allocated report stage losslessly compresses completed raw JSONL with
 verified hashes and a path mapping; training logs and checkpoints remain intact.
 The [configuration evidence](docs/CONFIG_TUNING.md) describes the bounded CPU

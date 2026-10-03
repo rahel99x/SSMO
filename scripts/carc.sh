@@ -28,9 +28,9 @@ Usage: bash scripts/carc.sh COMMAND [OPTIONS]
   report --from-run ID       Collect old artifacts plus fresh CPU diagnostics.
 Options:
   --run-id ID --gpu-profile a10040|a40|a30|l40|l40s --seed N
-  --config PATH --python-module python/VERSION --after JOBID --max-project-jobs N
+  --config PATH --python-module python/VERSION --after JOBID
   --submit | --dry-run --skip-install | --reinstall
-  --account-slots N --account-free-cpus N --account-free-mem-gb N
+  --account-free-cpus N --account-free-mem-gb N
   --account-free-gpus N
 Recovery: --from-run ID --method measure|state_only
   --checkpoint PATH applies to evaluate/report; --resume PATH applies to resume.
@@ -54,10 +54,8 @@ run_id= from_run= config= after= checkpoint= resume=
 submit=0 skip_install=0 reinstall=0
 profile=${SSMO_GPU_PROFILE:-a10040}
 python_module=${SSMO_PYTHON_MODULE:-python/3.12.8}
-max_jobs=${SSMO_MAX_PROJECT_JOBS:-10}
 method=measure seed=17
 profile_set=0 module_set=0 method_set=0 seed_set=0
-slots=${SSMO_ACCOUNT_SLOTS:-}
 free_cpus=${SSMO_ACCOUNT_FREE_CPUS:-}
 free_mem=${SSMO_ACCOUNT_FREE_MEM_GB:-}
 free_gpus=${SSMO_ACCOUNT_FREE_GPUS:-}
@@ -70,7 +68,7 @@ while (( $# )); do
         --dry-run) submit=0; shift; continue ;;
         --skip-install) skip_install=1; shift; continue ;;
         --reinstall) reinstall=1; shift; continue ;;
-        --run-id|--from-run|--config|--gpu-profile|--python-module|--seed|--method|--after|--checkpoint|--resume|--max-project-jobs|--account-slots|--account-free-cpus|--account-free-mem-gb|--account-free-gpus)
+        --run-id|--from-run|--config|--gpu-profile|--python-module|--seed|--method|--after|--checkpoint|--resume|--account-free-cpus|--account-free-mem-gb|--account-free-gpus)
             (( $# >= 2 )) || { ssmo_error "missing value for $1"; exit 2; }
             flag=$1 value=$2
             case "$flag" in
@@ -81,8 +79,7 @@ while (( $# )); do
                 --python-module) python_module=$value; module_set=1 ;;
                 --seed) seed=$value; seed_set=1 ;;
                 --method) method=$value; method_set=1 ;;
-                --max-project-jobs) max_jobs=$value ;;
-                --account-slots) slots=$value ;; --account-free-cpus) free_cpus=$value ;;
+                --account-free-cpus) free_cpus=$value ;;
                 --account-free-mem-gb) free_mem=$value ;; --account-free-gpus) free_gpus=$value ;;
             esac
             shift 2 ;;
@@ -112,7 +109,7 @@ done
 valid_id() { [[ "$1" =~ ^[A-Za-z0-9][A-Za-z0-9_-]{0,79}$ ]]; }
 [[ -z "$run_id" ]] || valid_id "$run_id" || { ssmo_error 'invalid run ID'; exit 2; }
 [[ -z "$from_run" ]] || valid_id "$from_run" || { ssmo_error 'invalid source run ID'; exit 2; }
-[[ "$seed" =~ ^[0-9]+$ && "$max_jobs" =~ ^[1-9][0-9]*$ ]] || { ssmo_error 'invalid seed/job bound'; exit 2; }
+[[ "$seed" =~ ^[0-9]+$ ]] || { ssmo_error 'invalid seed'; exit 2; }
 [[ "$method" = measure || "$method" = state_only ]] || { ssmo_error 'invalid method'; exit 2; }
 [[ "$python_module" =~ ^python/[A-Za-z0-9._+-]+$ ]] || { ssmo_error 'invalid Python module'; exit 2; }
 [[ -z "$after" || "$after" =~ ^[0-9]+$ ]] || { ssmo_error '--after requires one real job ID'; exit 2; }
@@ -144,7 +141,7 @@ run_dir=$(ssmo_path "runs/$run_id")
 if [[ "$command" = discover ]]; then
     [[ -z "$from_run" ]] || { ssmo_error 'discover does not use --from-run'; exit 2; }
     bash "$SSMO_PROJECT_ROOT/scripts/discover_carc.sh" --run-id "$run_id"
-    printf 'Review %s/discovery and set all four SSMO_ACCOUNT_* free-capacity values.\n' "$run_dir"
+    printf 'Review %s/discovery and set the three SSMO_ACCOUNT_FREE_* resource values.\n' "$run_dir"
     exit 0
 fi
 
@@ -250,7 +247,7 @@ config=$(ssmo_path "$config")
 case "$profile" in a10040|a40|a30|l40|l40s) ;; *) ssmo_error 'invalid recorded GPU profile'; exit 2 ;; esac
 [[ "$python_module" =~ ^python/[A-Za-z0-9._+-]+$ ]] || { ssmo_error 'invalid recorded Python module'; exit 2; }
 
-args=(--config "$config" --run-id "$run_id" --gpu-profile "$profile" --python-module "$python_module" --seed "$seed" --method "$method" --max-project-jobs "$max_jobs")
+args=(--config "$config" --run-id "$run_id" --gpu-profile "$profile" --python-module "$python_module" --seed "$seed" --method "$method")
 case "$command" in
     setup|smoke|pilot)
         args+=(--pipeline "$command")
@@ -264,12 +261,12 @@ esac
 [[ -z "$after" ]] || args+=(--after "$after")
 if (( submit )); then
     [[ "$SSMO_PROJECT_ROOT" = /home1/aadaniel/projects/SSMO && "$(id -un)" = aadaniel ]] || { ssmo_error 'live actions require CARC aadaniel and the approved SSMO root'; exit 2; }
-    for value in "$slots" "$free_cpus" "$free_mem" "$free_gpus"; do
-        [[ "$value" =~ ^[0-9]+$ ]] || { ssmo_error 'set all four reviewed SSMO_ACCOUNT_* free-capacity values (or explicit capacity flags); run discover to review them'; exit 2; }
+    for value in "$free_cpus" "$free_mem" "$free_gpus"; do
+        [[ "$value" =~ ^[0-9]+$ ]] || { ssmo_error 'set all three reviewed SSMO_ACCOUNT_FREE_* resource values (or explicit resource flags); run discover to review them'; exit 2; }
     done
     discovery="ssmo-policy-$(date -u +%Y%m%dT%H%M%SZ)-$$-$RANDOM"
     bash "$SSMO_PROJECT_ROOT/scripts/discover_carc.sh" --run-id "$discovery"
-    args+=(--discovery "$discovery" --account-slots "$slots" --account-free-cpus "$free_cpus" --account-free-mem-gb "$free_mem" --account-free-gpus "$free_gpus" --submit)
+    args+=(--discovery "$discovery" --account-free-cpus "$free_cpus" --account-free-mem-gb "$free_mem" --account-free-gpus "$free_gpus" --submit)
 else
     printf 'Preview only. Add --submit after reviewing site policy and free capacity.\n'
 fi

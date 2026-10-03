@@ -89,7 +89,7 @@ printf '%s;mockcluster\\n' "$n"
     def run_wrapper(self, *args, live=False):
         flags = ["--run-id", "fixture"]
         if live:
-            flags += ["--submit", "--discovery", "observed", "--account-slots", "10",
+            flags += ["--submit", "--discovery", "observed",
                       "--account-free-cpus", "4", "--account-free-mem-gb", "8",
                       "--account-free-gpus", "1"]
         return subprocess.run(["bash", str(self.root / "scripts" / "submit.sh"), *flags, *args],
@@ -251,16 +251,54 @@ printf '%s;mockcluster\\n' "$n"
                 self.assertIn("CARC storage requires", result.stderr)
         self.assertFalse((self.bin / "local").exists())
 
-    def test_account_queue_changes_and_caps_block_before_submit(self):
-        self.env["MOCK_QUEUE"] = "9|other|other-project|RUNNING|4|8G|gpu:a100:1"
+    def test_new_running_allocations_and_insufficient_free_resources_block_before_submit(self):
+        self.env["MOCK_ACCOUNT_QUEUE"] = "9|other|other-project|RUNNING|4|8G|gpu:a100:1"
         result = self.run_wrapper(live=True)
         self.assertNotEqual(result.returncode, 0)
-        self.assertIn("queue changed", result.stderr)
+        self.assertIn("allocations changed", result.stderr)
         self.assertFalse(self.calls.exists())
-        self.env.pop("MOCK_QUEUE")
+        self.assertFalse((self.root / "runs/fixture").exists())
+        self.env.pop("MOCK_ACCOUNT_QUEUE")
         result = self.run_wrapper("--account-free-cpus", "1", live=True)
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("insufficient", result.stderr)
+
+    def test_many_pending_other_projects_and_new_ssmo_pending_jobs_allow_verified_reuse(self):
+        self.verified_environment()
+        account_rows = []
+        user_rows = []
+        for project in range(1, 6):
+            for job in range(20):
+                job_id = 1000 + project * 20 + job
+                name = f"OTHER-{project}-small-{job}"
+                account_rows.append(f"{job_id}|aadaniel|{name}|PENDING|1|1G|N/A")
+                user_rows.append(f"{job_id}|{name}|PENDING|anakano_81|1|1G|N/A")
+        account_rows.append("2001|aadaniel|SSMO-previous-train-measure|PENDING|2|8G|gpu:a100:1")
+        user_rows.append("2001|SSMO-previous-train-measure|PENDING|anakano_81|2|8G|gpu:a100:1")
+        self.env["MOCK_ACCOUNT_QUEUE"] = "\n".join(account_rows)
+        self.env["MOCK_USER_QUEUE"] = "\n".join(user_rows)
+
+        result = self.run_wrapper("--skip-install", live=True)
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+        with (self.root / "runs/fixture/jobs.tsv").open() as stream:
+            jobs = list(csv.DictReader(stream, delimiter="\t"))
+        self.assertEqual(len(jobs), 6)
+        self.assertEqual(jobs[0]["stage"], "validate")
+        self.assertNotIn("install", [row["stage"] for row in jobs])
+        self.assertNotIn("scancel", result.stdout + result.stderr + self.calls.read_text())
+
+    def test_allocation_queue_reordering_and_pending_changes_do_not_invalidate_discovery(self):
+        self.verified_environment()
+        first = "51|other|OTHER-running-cpu|RUNNING|1|1G|N/A"
+        second = "52|aadaniel|OTHER-running-gpu|RUNNING|1|2G|gpu:a30:1"
+        (self.discovery / "account_jobs.txt").write_text(f"{first}\n{second}\n53|other|old-pending|PENDING|1|1G|N/A\n")
+        self.env["MOCK_ACCOUNT_QUEUE"] = f"99|other|new-pending|PENDING|1|1G|N/A\n{second}\n{first}\n"
+
+        result = self.run_wrapper("--skip-install", live=True)
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertTrue(self.calls.exists())
 
     def test_unknown_gpu_tag_is_rejected_and_l40s_is_distinct(self):
         result = self.run_wrapper("--gpu-profile", "l40s", live=True)
@@ -271,7 +309,7 @@ printf '%s;mockcluster\\n' "$n"
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("not observed", result.stderr)
 
-    def test_failed_stale_discovery_and_pipeline_limits(self):
+    def test_failed_and_stale_discovery_block_submission(self):
         (self.discovery / "status.tsv").write_text("command\texit_code\nquota\t1\n")
         result = self.run_wrapper(live=True)
         self.assertNotEqual(result.returncode, 0)
@@ -282,9 +320,36 @@ printf '%s;mockcluster\\n' "$n"
         result = self.run_wrapper(live=True)
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("within one hour", result.stderr)
+
+    def test_pilot_preview_allows_nine_jobs_without_pending_cap_flags(self):
         result = self.run_wrapper("--pipeline", "pilot")
-        self.assertNotEqual(result.returncode, 0)
-        self.assertIn("9 jobs", result.stderr)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        commands = [shlex.split(line) for line in result.stdout.splitlines() if line.startswith("sbatch ")]
+        self.assertEqual(len(commands), 9)
+        self.assertTrue(all("--account=anakano_81" in command for command in commands))
+        self.assertFalse(self.calls.exists())
+        self.assertFalse((self.root / "runs/fixture").exists())
+        self.assertFalse((self.root / "local").exists())
+
+    def test_every_gpu_profile_has_one_gpu_and_at_most_thirty_minutes_per_stage(self):
+        for profile in ("a10040", "a40", "a30", "l40", "l40s"):
+            with self.subTest(profile=profile):
+                result = self.run_wrapper("--pipeline", "pilot", "--gpu-profile", profile)
+                self.assertEqual(result.returncode, 0, result.stderr)
+                commands = [shlex.split(line) for line in result.stdout.splitlines() if line.startswith("sbatch ")]
+                gpu_commands = [command for command in commands if "--partition=gpu" in command]
+                self.assertEqual(len(gpu_commands), 5)
+                for command in gpu_commands:
+                    wall = next(arg.removeprefix("--time=") for arg in command if arg.startswith("--time="))
+                    hours, minutes, seconds = map(int, wall.split(":"))
+                    self.assertLessEqual(hours * 3600 + minutes * 60 + seconds, 1800)
+                    requests = [arg for arg in command if arg.startswith("--gpus-per-task=")]
+                    self.assertEqual(len(requests), 1)
+                    expected = "a100" if profile == "a10040" else profile
+                    self.assertEqual(requests[0], f"--gpus-per-task={expected}:1")
+                    self.assertIn("--ntasks=1", command)
+        self.assertFalse(self.calls.exists())
+        self.assertFalse((self.root / "runs/fixture").exists())
 
     def test_resume_and_future_downstream_use_fresh_id_and_afterok(self):
         previous = self.root / "runs" / "previous" / "artifacts"
@@ -342,7 +407,7 @@ printf '%s;mockcluster\\n' "$n"
         self.assertIn("Git metadata unavailable", (run / "source-status.txt").read_text())
         self.assertTrue((run / "source-sha256.txt").is_file())
 
-    def test_install_submission_waits_for_other_project_pending_jobs(self):
+    def test_install_submission_waits_for_other_ssmo_pending_jobs(self):
         self.env["MOCK_USER_QUEUE"] = "9|SSMO-other-train-measure|PENDING|anakano_81|2|8G|gpu:a100:1"
         result = self.run_wrapper(live=True)
         self.assertNotEqual(result.returncode, 0)

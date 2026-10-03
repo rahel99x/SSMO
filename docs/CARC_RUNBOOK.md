@@ -48,26 +48,60 @@ queue. Every discovery command must succeed. An observed GPU or partition alone
 does not establish account authorization or available capacity.
 
 Edit **`local/carc_site.env`**, which is ignored by Git and used automatically.
-Keep the module as `python/3.12.8`; choose an observed GPU profile. Fill all four
-`SSMO_ACCOUNT_*` values with **currently reviewed free account capacity**:
+Keep the module as `python/3.12.8`; choose an observed GPU profile. Fill the three
+`SSMO_ACCOUNT_FREE_*` values with **currently reviewed free resource capacity**:
 
 | Setting | Meaning |
 |---|---|
-| `SSMO_ACCOUNT_SLOTS` | Free queued/running submission slots |
 | `SSMO_ACCOUNT_FREE_CPUS` | Free allocatable CPUs |
 | `SSMO_ACCOUNT_FREE_MEM_GB` | Free host memory in GiB |
 | `SSMO_ACCOUNT_FREE_GPUS` | Free GPUs |
-| `SSMO_MAX_PROJECT_JOBS` | Cap on this project's queued plus running jobs; default 10 |
 
 The template leaves capacity values empty deliberately. These are shared-account
 headroom, not total node capacity or account maxima. Review them before every
 live action and update them when other work changes. The frontend cannot infer
 all CARC policy semantics; it never invents these values.
 
-The settings file uses defaults such as `: "${SSMO_ACCOUNT_SLOTS:=}"`; put the
-reviewed number after `:=`, or use ordinary `SSMO_ACCOUNT_SLOTS=...` assignments.
+The settings file uses defaults such as `: "${SSMO_ACCOUNT_FREE_CPUS:=}"`; put the
+reviewed number after `:=`, or use ordinary `SSMO_ACCOUNT_FREE_CPUS=...` assignments.
 Environment or explicit command flags can override the template defaults. An
 explicit project-confined `SSMO_SITE_CONFIG` selects another settings file.
+
+The supplied `ssmo-policy-001` snapshot, observed on 2026-10-03, confirms
+`aadaniel`'s `anakano_81` association, `python/3.12.8`, and A100, A40 and L40S
+nodes in the `gpu` partition. All four account queue entries were PENDING;
+none showed an active allocation. For that reviewed snapshot, a conservative
+resource envelope for one serial SSMO pipeline is:
+
+```bash
+SSMO_PYTHON_MODULE=python/3.12.8
+SSMO_GPU_PROFILE=a10040
+SSMO_ACCOUNT_FREE_CPUS=4
+SSMO_ACCOUNT_FREE_MEM_GB=8
+SSMO_ACCOUNT_FREE_GPUS=1
+```
+
+Use those assignments in `local/carc_site.env` after confirming the observations
+remain current. These numbers cover the pipeline's peak requests; they do not
+claim total free cluster capacity or reserve resources. Slurm determines when
+hardware becomes available. The observed `normal` QoS permits 2,000 CPUs and
+36 GPUs per user; the `gpu` partition QoS includes per-user limits of 400 CPUs,
+36 GPUs in total, 12 A100, 12 A40 and six L40S. The serial pipeline requests at most four CPUs,
+8 GiB and one GPU. A30 and plain L40 remain supported profiles, but neither was
+observed in this snapshot; choose them only after fresh discovery confirms them.
+
+There is no project job-count cap or manual submission-slot setting. Other
+projects can enqueue concurrently. Pending-job additions, removals and queue
+ordering do not invalidate resource review; changes to non-pending allocations
+require refreshed CPU/memory/GPU headroom. CARC's scheduler enforces site limits.
+
+For an existing local settings file, remove the retired count settings:
+
+```bash
+sed -i '/SSMO_MAX_PROJECT_JOBS/d; /SSMO_ACCOUNT_SLOTS/d' local/carc_site.env
+```
+
+Stale environment values for those retired settings are ignored by the frontend.
 
 | GPU profile | Typed GPU request | Additional requirement |
 |---|---|---|
@@ -94,8 +128,8 @@ command is the exception and records observations inside SSMO.
 
 With `--submit`, the frontend captures fresh discovery automatically, checks
 reviewed capacity, then submits a serial `afterok` chain. Setup runs installation,
-CPU validation and allocated GPU kernel/memory checks. Defaults need three
-submission slots, at most four CPUs, 8 GiB host memory and one GPU. Each allocation
+CPU validation and allocated GPU kernel/memory checks. Setup submits three jobs
+initially and needs at most four CPUs, 8 GiB host memory and one GPU. Each allocation
 explicitly charges `anakano_81`.
 
 Installation uses `.venv` with copied interpreters, pinned base dependencies and
@@ -147,7 +181,11 @@ and four range-holdout parents. A short smoke is not a research accuracy claim.
 | Evaluate | `gpu` | 2 | 8G | 10 minutes |
 | Report | `main` | 2 | 4G | 15 minutes |
 
-Every stage uses one task; GPU stages request one GPU. These retained resource
+Every stage uses one task; GPU stages request one GPU. The longest GPU allocation
+is **30 minutes**; GPU audit and evaluation have **15- and 10-minute** limits.
+Smoke training has a 120-second application budget and pilot training 300 seconds.
+Pending queue time consumes no allocated GPU time. Each pipeline is serial;
+there are no automatic retries or repeated resume loops. These retained resource
 requests are conservative starting limits, not measured hardware optima. Do not
 raise CPU, RAM, GPU count or walltime without calibration. Host RAM is not GPU
 VRAM. Thread counts are capped by `SLURM_CPUS_PER_TASK`.
@@ -169,8 +207,8 @@ train/validation/test/range-holdout parents, 500 maximum updates, validation eve
 application budget is 300 seconds per training invocation.
 
 The measure and `state_only` control use the same architecture and budgets.
-The pilot has nine jobs with installation or eight with verified reuse. Use a
-project cap allowing that chain and reviewed free submission slots for every job;
+The pilot has nine jobs with installation or eight with verified reuse. Review
+current free CPU/memory/GPU resources before submitting;
 peak per-stage requests remain four CPUs, 8 GiB host memory and one GPU.
 
 These settings were selected from a bounded CPU validation-only search and
@@ -243,8 +281,8 @@ merge every unrelated or earlier recovery directory; retain those directories
 as separate evidence. No automatic job cancellation, run removal, unbounded retries or
 Slurm signal requests occur.
 
-Failed `afterok` descendants can remain pending, count toward project caps and
-block installation. Inspect individually recorded IDs and cancel only reviewed
+Failed `afterok` descendants can remain pending and protect the shared venv
+against reinstallation. Inspect individually recorded IDs and cancel only reviewed
 blocked descendants of the abandoned chain. Rebuild dependencies using new
 successful IDs. Never cancel all jobs belonging to the account or user.
 Periodic checkpoints remain necessary because advance signal delivery has not

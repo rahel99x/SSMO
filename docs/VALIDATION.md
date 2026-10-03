@@ -139,3 +139,34 @@ The corrected revision passed **108/108 CPU tests**, with zero failures, errors
 or skips, from an unchanged read-only source copy under
 `runs/ssmo-root-correction-audit-20261003T091909Z-157716/`. `pip check` passed.
 Slurm checks remain mocked; no CARC jobs were submitted for this correction.
+
+## Concurrent projects and bounded GPU duration
+
+Following the user's queue-policy update, local project job-count caps and the
+manual submission-slot field are removed. The three reviewed free resource
+values (CPU, host memory, GPU) remain. Account freshness compares sorted
+non-PENDING allocation rows; pending jobs from other projects can be submitted
+or removed concurrently. Running/allocation changes still require resource
+review. Queued/running SSMO tasks continue protecting their shared venv against
+reinstallation.
+
+GPU stage walltimes remain capped at 30 minutes for training, 15 minutes for the
+kernel audit and ten minutes for evaluation. One task receives one GPU, and each
+pipeline is serial. Smoke and pilot training application budgets remain 120 and
+300 seconds. Queue waiting time consumes no allocated GPU time; automatic
+retries and unbounded recovery loops are absent.
+
+This revision passed **113/113 CPU tests**, with zero failures, errors, skips
+or expected failures, from an unchanged read-only source copy under
+`runs/ssmo-duration-audit-20261003T094808Z-184270/`. Regression checks cover
+concurrent pending jobs across five other projects, removal of both retired
+count settings, allocation changes and the 30-minute maximum GPU walltime for
+every supported GPU profile. Slurm checks remain mocked; no CARC jobs were
+submitted during this validation.
+
+The user's supplied successful `ssmo-policy-001` discovery confirms the
+`anakano_81` association, Python 3.12.8, A100/A40/L40S hardware and an account
+queue containing only PENDING jobs at that observation. The runbook records a
+conservative four-CPU, 8-GiB, one-GPU envelope for that snapshot; checked-in free
+capacity fields stay empty because a historical observation cannot establish
+future headroom. A30 and plain L40 were not present in this supplied discovery.
