@@ -94,7 +94,7 @@ ssmo_env() {
 }
 
 ssmo_load_python() {
-    local selected=${SSMO_PYTHON_MODULE:-python/3.11.9}
+    local selected=${SSMO_PYTHON_MODULE:-python/3.12.8}
     [[ "$selected" =~ ^python/[A-Za-z0-9._+-]+$ ]] || { ssmo_error 'invalid standalone Python module name'; return 1; }
     type module >/dev/null 2>&1 || { ssmo_error 'CARC module function unavailable in this shell'; return 1; }
     module load "$selected" || return 1

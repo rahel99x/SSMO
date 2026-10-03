@@ -20,7 +20,7 @@ account_slots=
 free_cpus=
 free_mem=
 free_gpus=
-python_module=python/3.11.9
+python_module=python/3.12.8
 usage() {
     cat <<'USAGE'
 Usage: scripts/submit.sh [--config PATH] [--run-id ID] [--submit]

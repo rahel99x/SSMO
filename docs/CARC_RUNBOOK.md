@@ -57,7 +57,16 @@ libraries and Slurm retain their names and point into this project's storage.
 
 The helper sets project-local temporary/cache paths and preserves the caller's shell options. Do not source executable task or submission scripts: those use strict mode and are intended to run as separate Bash processes. Paths and symlinks must resolve inside the project root. The workflow must reject an output path, cache path or symlink escaping that root; do not substitute `/tmp`, `/scratch1` or a shared environment.
 
-Before dependency installation or Python execution, the helper redirects `TMPDIR`, `TMP`, `TEMP`, pip/XDG/PyTorch/compiler/Triton/extension/Matplotlib/CUDA caches and Python bytecode into the project. Load the selected standalone Python module inside allocated tasks as well as during venv creation. Invoke `.venv/bin/python` explicitly. The earlier `python/3.11.9` module and PyTorch CUDA 12.6 selection are observations to recheck, not permission to assume compatibility.
+Before dependency installation or Python execution, the helper redirects `TMPDIR`, `TMP`, `TEMP`, pip/XDG/PyTorch/compiler/Triton/extension/Matplotlib/CUDA caches and Python bytecode into the project. The user confirmed the CARC module as `python/3.12.8`; this is the default in the submission wrapper and module-loading helper. Load it inside allocated tasks as well as during venv creation, and invoke `.venv/bin/python` explicitly. Discovery must still record its availability, and the pinned PyTorch CUDA 12.6 wheel requires the allocated compatibility audit.
+
+Use `--python-module python/3.12.8` when selecting it explicitly. The module is
+loaded by the allocated stage; do not install dependencies on the login node.
+
+If a CARC `.venv` already exists, inspect `.venv/pyvenv.cfg`: installation reuses
+that interpreter. If it was created with a different Python module, first wait
+for all queued/running SSMO tasks to finish, preserve the old venv under a fresh
+backup name inside SSNO, and create the replacement through the Slurm install
+stage. Do not replace an active environment.
 
 The allocated install stage uses `python3 -m venv --copies` so the venv interpreter does not escape the root through a standard venv symlink. It installs pinned base requirements and `torch==2.10.0+cu126` from PyTorch's official `https://download.pytorch.org/whl/cu126` index, preserves TLS verification, runs `pip check`, and writes `dependency-freeze.txt` plus `installed-versions.json`. The selected CUDA wheel still needs the actual allocated kernel audit. The venv is shared only within this project: an exclusive installation lock and shared runtime locks protect active scientific tasks. Installation is also refused while another SSMO run has queued/running jobs, with a second queue check inside the install task. Pending tasks hold no lock; each task compares the full installed freeze against its run's recorded freeze before computation, records its fingerprint and stops on drift. If installation reports the venv is in use, allow the existing tasks to finish before retrying; do not overwrite the environment.
 

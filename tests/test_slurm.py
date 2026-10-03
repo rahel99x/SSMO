@@ -64,7 +64,7 @@ printf '%s;mockcluster\\n' "$n"
             "manifest.txt": "observed test fixture\n",
             "identity.txt": "aadaniel\n",
             "associations.txt": "anakano_81|aadaniel||normal|||\n",
-            "modules.txt": "python/3.11.9 python/3.12.0\n",
+            "modules.txt": "python/3.12.8 python/3.12.0\n",
             "partitions.txt": "main*|up|(null)|1-00:00:00|64|256000\ngpu|up|gpu:a100:4|1-00:00:00|64|256000\n",
             "gpu_nodes.txt": "n1|gpu:a100:4|a100-40gb|256000|64\nn2|gpu:a40:4|(null)|256000|64\nn3|gpu:a30:4|(null)|256000|64\nn4|gpu:l40:4|(null)|256000|64\nn5|gpu:l40s:4|(null)|256000|64\n",
             "main.txt": "PartitionName=main State=UP\n",
