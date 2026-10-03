@@ -16,7 +16,7 @@ or the CLI audit, with the venv interpreter and confined caches. Full tests run
 in seconds; tests with mocked Slurm do not establish CARC execution. Actual
 CARC tests, installation, generation, training and benchmarks require Slurm
 allocations and `srun`, explicit `--account=anakano_81`, and root
-`/home1/aadaniel/projects/SSNO`. Read docs/CARC_RUNBOOK.md before deployment.
+`/home1/aadaniel/projects/SSMO`. Read docs/CARC_RUNBOOK.md before deployment.
 Preparing scripts does not authorize live submissions. `submit.sh` is dry-run
 by default; preserve Slurm's `CUDA_VISIBLE_DEVICES` and use `cuda:0`.
 Use `scripts/carc.sh` for normal CARC discovery/setup/smoke/pilot/status/recovery.

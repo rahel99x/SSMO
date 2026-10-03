@@ -4,8 +4,8 @@ set -euo pipefail
 source "$(dirname -- "${BASH_SOURCE[0]}")/carc_env.sh"
 ssmo_init_root
 [[ $# = 1 ]] || { ssmo_error 'usage: compact_logs.sh CURRENT_RUN_DIRECTORY'; exit 2; }
-[[ "$SSMO_PROJECT_ROOT" = /home1/aadaniel/projects/SSNO && "$(id -un)" = aadaniel && "${SLURM_JOB_ID:-}" =~ ^[0-9]+$ && "${SLURM_JOB_ACCOUNT:-}" = anakano_81 ]] || {
-    ssmo_error 'log compaction requires an allocated CARC anakano_81 task in the approved SSNO root'
+[[ "$SSMO_PROJECT_ROOT" = /home1/aadaniel/projects/SSMO && "$(id -un)" = aadaniel && "${SLURM_JOB_ID:-}" =~ ^[0-9]+$ && "${SLURM_JOB_ACCOUNT:-}" = anakano_81 ]] || {
+    ssmo_error 'log compaction requires an allocated CARC anakano_81 task in the approved SSMO root'
     exit 2
 }
 SSMO_COMPACTION_RUN=$(ssmo_path "$1")

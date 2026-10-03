@@ -12,7 +12,7 @@ from singular_sensitivity.runtime import confined_path
 
 
 REPO = Path(__file__).resolve().parents[1]
-CARC_ROOT = "/home1/aadaniel/projects/SSNO"
+CARC_ROOT = "/home1/aadaniel/projects/SSMO"
 
 
 class CarcFrontendTests(unittest.TestCase):

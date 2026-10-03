@@ -4,7 +4,7 @@ set -euo pipefail
 SSMO_PROJECT_ROOT=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd -P)
 export SSMO_PROJECT_ROOT
 source "$SSMO_PROJECT_ROOT/scripts/carc_env.sh"
-if [[ "$SSMO_PROJECT_ROOT" = /home1/aadaniel/projects/SSNO ]]; then
+if [[ "$SSMO_PROJECT_ROOT" = /home1/aadaniel/projects/SSMO ]]; then
     ssmo_error 'Use the module-aware Slurm install stage on CARC'
     exit 2
 fi

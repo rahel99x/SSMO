@@ -138,7 +138,7 @@ resources() {
 }
 
 if (( submit )); then
-    [[ "$SSMO_PROJECT_ROOT" = /home1/aadaniel/projects/SSNO ]] || { ssmo_error 'live submissions require the exact CARC project root'; exit 2; }
+    [[ "$SSMO_PROJECT_ROOT" = /home1/aadaniel/projects/SSMO ]] || { ssmo_error 'live submissions require the exact CARC project root'; exit 2; }
     [[ $(id -un) = aadaniel ]] || { ssmo_error 'live submissions require CARC user aadaniel'; exit 2; }
     command -v sbatch >/dev/null || { ssmo_error 'sbatch unavailable'; exit 2; }
     [[ "$discovery" =~ ^[A-Za-z0-9][A-Za-z0-9_-]{0,79}$ ]] || { ssmo_error '--discovery ID is required for live submissions'; exit 2; }

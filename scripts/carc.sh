@@ -263,7 +263,7 @@ case "$command" in
 esac
 [[ -z "$after" ]] || args+=(--after "$after")
 if (( submit )); then
-    [[ "$SSMO_PROJECT_ROOT" = /home1/aadaniel/projects/SSNO && "$(id -un)" = aadaniel ]] || { ssmo_error 'live actions require CARC aadaniel and the approved SSNO root'; exit 2; }
+    [[ "$SSMO_PROJECT_ROOT" = /home1/aadaniel/projects/SSMO && "$(id -un)" = aadaniel ]] || { ssmo_error 'live actions require CARC aadaniel and the approved SSMO root'; exit 2; }
     for value in "$slots" "$free_cpus" "$free_mem" "$free_gpus"; do
         [[ "$value" =~ ^[0-9]+$ ]] || { ssmo_error 'set all four reviewed SSMO_ACCOUNT_* free-capacity values (or explicit capacity flags); run discover to review them'; exit 2; }
     done

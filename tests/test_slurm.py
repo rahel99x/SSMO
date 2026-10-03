@@ -15,7 +15,7 @@ from singular_sensitivity.runtime import confined_path
 
 
 REPO = Path(__file__).resolve().parents[1]
-CARC_ROOT = "/home1/aadaniel/projects/SSNO"
+CARC_ROOT = "/home1/aadaniel/projects/SSMO"
 
 
 class SlurmWorkflowTests(unittest.TestCase):
@@ -242,11 +242,13 @@ printf '%s;mockcluster\\n' "$n"
 
     def test_carc_root_guard_rejects_other_directory_before_cache_creation(self):
         helper = shlex.quote(str(self.root / "scripts" / "carc_env.sh"))
-        env = dict(self.env, SSMO_PROJECT_ROOT=str(self.bin))
-        result = subprocess.run(["bash", "-c", f"source {helper}; ssmo_env"],
-                                env=env, text=True, capture_output=True)
-        self.assertNotEqual(result.returncode, 0)
-        self.assertIn("CARC storage requires", result.stderr)
+        for rejected in (self.bin, Path("/home1/aadaniel/projects/SSNO")):
+            with self.subTest(root=rejected):
+                env = dict(self.env, SSMO_PROJECT_ROOT=str(rejected))
+                result = subprocess.run(["bash", "-c", f"source {helper}; ssmo_env"],
+                                        env=env, text=True, capture_output=True)
+                self.assertNotEqual(result.returncode, 0)
+                self.assertIn("CARC storage requires", result.stderr)
         self.assertFalse((self.bin / "local").exists())
 
     def test_account_queue_changes_and_caps_block_before_submit(self):

@@ -1,10 +1,10 @@
 # Automated SSMO workflow on USC CARC
 
-Use **`/home1/aadaniel/projects/SSNO`** for every CARC file: checkout, `.venv`,
+Use **`/home1/aadaniel/projects/SSMO`** for every CARC file: checkout, `.venv`,
 downloads, caches, temporary files, data, logs, reports and checkpoints. Do not
-create or modify files elsewhere, including `/tmp` and `/scratch1`. This latest
-user instruction overrides older directories in the supplied requirements.
-The GitHub repository and environment prefix remain **SSMO**.
+create or modify files elsewhere, including `/tmp` and `/scratch1`. The project
+name, CARC directory, GitHub repository and environment prefix are **SSMO**.
+The latest user correction supersedes the earlier SSNO directory spelling.
 
 Use username `aadaniel`, account `anakano_81`, standalone module
 **`python/3.12.8`**, and Python `venv`; never Conda. Login nodes are for lightweight
@@ -13,11 +13,11 @@ runs installation and computational stages through Slurm and `srun`.
 
 ## 1. Get the current code
 
-With `/home1/aadaniel/projects` already present and `SSNO` absent or empty:
+With `/home1/aadaniel/projects` already present and `SSMO` absent or empty:
 
 ```bash
-git clone --branch main https://github.com/rahel99x/SSMO.git /home1/aadaniel/projects/SSNO
-cd /home1/aadaniel/projects/SSNO
+git clone --branch main https://github.com/rahel99x/SSMO.git /home1/aadaniel/projects/SSMO
+cd /home1/aadaniel/projects/SSMO
 ```
 
 For an existing clean clone at that path, use `git pull --ff-only` inside it.
@@ -25,7 +25,7 @@ Preserve prior outputs and frozen snapshots. Earlier source archives are
 historical evidence, not deployment sources for this configuration.
 
 ```bash
-export SSMO_PROJECT_ROOT="/home1/aadaniel/projects/SSNO"
+export SSMO_PROJECT_ROOT="/home1/aadaniel/projects/SSMO"
 unset SSMO_ROOT
 bash scripts/carc.sh --help
 ```
@@ -90,7 +90,7 @@ bash scripts/carc.sh setup --run-id ssmo-setup-001 --submit
 
 Without `--submit`, experiment commands only print allocation commands: no
 policy records, caches, snapshots or jobs are created. The explicit `discover`
-command is the exception and records observations inside SSNO.
+command is the exception and records observations inside SSMO.
 
 With `--submit`, the frontend captures fresh discovery automatically, checks
 reviewed capacity, then submits a serial `afterok` chain. Setup runs installation,
@@ -103,7 +103,7 @@ Installation uses `.venv` with copied interpreters, pinned base dependencies and
 `pip check`, a full dependency freeze and a requirement/module fingerprint.
 An existing venv with a different Python version is refused. After all queued
 and running SSMO tasks finish, preserve it under a fresh backup name **inside
-SSNO** before creating a replacement; never replace an active environment.
+SSMO** before creating a replacement; never replace an active environment.
 
 If the current venv's Python version, CUDA wheel, recorded freeze and pinned
 requirements match, the frontend reuses it and omits installation. Allocated

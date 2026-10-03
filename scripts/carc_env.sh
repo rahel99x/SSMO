@@ -11,11 +11,11 @@ ssmo_init_root() {
         ssmo_error 'SSMO_PROJECT_ROOT and legacy SSMO_ROOT disagree'
         return 1
     fi
-    SSMO_PROJECT_ROOT=${SSMO_PROJECT_ROOT:-${SSMO_ROOT:-/home1/aadaniel/projects/SSNO}}
+    SSMO_PROJECT_ROOT=${SSMO_PROJECT_ROOT:-${SSMO_ROOT:-/home1/aadaniel/projects/SSMO}}
     # Check before creating any caches: CARC writes have one approved root.
     if [[ $(id -un) = aadaniel || -n ${SLURM_JOB_ID:-} ]]; then
-        [[ "$SSMO_PROJECT_ROOT" = /home1/aadaniel/projects/SSNO ]] || {
-            ssmo_error 'CARC storage requires /home1/aadaniel/projects/SSNO'
+        [[ "$SSMO_PROJECT_ROOT" = /home1/aadaniel/projects/SSMO ]] || {
+            ssmo_error 'CARC storage requires /home1/aadaniel/projects/SSMO'
             return 1
         }
     fi
@@ -109,7 +109,7 @@ ssmo_check_venv() {
     if [[ -n "$selected" ]]; then
         version=$(awk -F' = ' '$1 == "version" {print $2}' "$SSMO_PROJECT_ROOT/.venv/pyvenv.cfg")
         [[ "$version" = "${selected#python/}" ]] || {
-            ssmo_error 'venv Python version differs from requested module; preserve it inside SSNO and create a fresh environment after all tasks finish'
+            ssmo_error 'venv Python version differs from requested module; preserve it inside SSMO and create a fresh environment after all tasks finish'
             return 1
         }
     fi

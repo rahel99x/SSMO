@@ -92,7 +92,7 @@ The [configuration evidence](docs/CONFIG_TUNING.md) describes the bounded CPU
 validation search; these are measured starter settings, not GPU-specific optima.
 
 Every allocation charges `anakano_81`; project storage is
-`/home1/aadaniel/projects/SSNO`. CPU stages use `main`; GPU stages use `gpu`.
+`/home1/aadaniel/projects/SSMO`. CPU stages use `main`; GPU stages use `gpu`.
 A100 40 GB, A40, A30, L40 and L40S are separate profiles. Only currently observed
 GRES/feature labels may be submitted. Runtime audits execute CUDA kernels and
 mixed-derivative backward work in the allocated task and enforce the 80% measured

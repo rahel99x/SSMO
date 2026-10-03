@@ -6,7 +6,7 @@ SSMO_SCRIPT_DIRECTORY=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)
 source "$SSMO_SCRIPT_DIRECTORY/carc_env.sh"
 SSMO_PROJECT_ROOT=${SSMO_PROJECT_ROOT:-$(dirname -- "$SSMO_SCRIPT_DIRECTORY")}
 ssmo_env
-if [[ $(id -un) = aadaniel || -n ${SLURM_JOB_ID:-} || "$SSMO_PROJECT_ROOT" = /home1/aadaniel/projects/SSNO ]]; then
+if [[ $(id -un) = aadaniel || -n ${SLURM_JOB_ID:-} || "$SSMO_PROJECT_ROOT" = /home1/aadaniel/projects/SSMO ]]; then
     ssmo_error 'tune_local.sh is for cloud/local CPU use; do not tune on a CARC login node'
     exit 2
 fi

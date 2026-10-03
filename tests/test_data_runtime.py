@@ -48,6 +48,17 @@ class DataRuntimeTests(unittest.TestCase):
                         initialize_storage(unrelated)
             self.assertFalse(unrelated.exists())
 
+    def test_carc_storage_uses_ssmo_and_rejects_prior_spelling(self):
+        from singular_sensitivity.runtime import CARC_PROJECT_ROOT, _check_carc_storage
+        self.assertEqual(CARC_PROJECT_ROOT, Path("/home1/aadaniel/projects/SSMO"))
+        with patch.dict(os.environ, {"SLURM_JOB_ID": "mock-allocation"}):
+            # The approved path passes policy without touching the filesystem.
+            _check_carc_storage(CARC_PROJECT_ROOT)
+            with patch("pathlib.Path.mkdir") as mkdir:
+                with self.assertRaisesRegex(ValueError, "CARC storage"):
+                    initialize_storage(Path("/home1/aadaniel/projects/SSNO"))
+                mkdir.assert_not_called()
+
     def test_compact_reproducible_disjoint_parents(self):
         config = load_config(project_root() / "configs/smoke.yaml")
         manifest = generate_manifest(config)

@@ -19,7 +19,7 @@ import time
 from typing import Any
 
 
-CARC_PROJECT_ROOT = Path("/home1/aadaniel/projects/SSNO")
+CARC_PROJECT_ROOT = Path("/home1/aadaniel/projects/SSMO")
 
 
 def _check_carc_storage(base: Path) -> None:

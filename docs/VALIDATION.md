@@ -125,3 +125,17 @@ and the independent assessment under `runs/ssmo-heldout-assessment-002/`.
 Verified level-one gzip reduced the latter directory from approximately 72.54 MB
 to 7.05 MB while retaining every raw record, original summary and checksum
 receipt. Generated runs remain ignored by Git; aggregate evidence is committed.
+
+## SSMO directory correction
+
+The user's latest correction sets the project name and approved CARC root to
+**SSMO**, `/home1/aadaniel/projects/SSMO`. Active Bash/Python storage guards,
+Slurm source paths, site settings and deployment guidance now use that path.
+The earlier SSNO audit above is historical evidence, not current deployment
+guidance. Explicit regression checks reject the former spelling before creating
+caches or files; strict containment remains in force.
+
+The corrected revision passed **108/108 CPU tests**, with zero failures, errors
+or skips, from an unchanged read-only source copy under
+`runs/ssmo-root-correction-audit-20261003T091909Z-157716/`. `pip check` passed.
+Slurm checks remain mocked; no CARC jobs were submitted for this correction.
