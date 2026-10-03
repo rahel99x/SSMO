@@ -128,8 +128,8 @@ bash scripts/carc.sh smoke --run-id ssmo-smoke-001 --submit
 bash scripts/carc.sh status --run-id ssmo-smoke-001
 ```
 
-A smoke can also bootstrap directly without a separate setup invocation. Fresh
-setup has seven jobs; with a verified venv there are six. It runs validation,
+A smoke can also bootstrap directly without a separate setup invocation. A fresh
+smoke has seven jobs; with a verified venv there are six. It runs validation,
 compact CPU data generation, GPU audit, measure training, evaluation and CPU
 report diagnostics. Jobs are serial; this is never a multi-GPU campaign.
 
