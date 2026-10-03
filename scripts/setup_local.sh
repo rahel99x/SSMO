@@ -10,8 +10,8 @@ if [[ "$SSMO_PROJECT_ROOT" = /home1/aadaniel/projects/SSMO ]]; then
 fi
 ssmo_env
 ssmo_check_tree "$SSMO_PROJECT_ROOT/.venv"
-exec 9> "$SSMO_PROJECT_ROOT/local/venv.lock"
-flock -n -x 9 || { ssmo_error 'venv is in use; install after existing tasks finish'; exit 3; }
+exec 9<> "$SSMO_PROJECT_ROOT/local/venv.lock"
+ssmo_lock_venv -x 'venv is in use; install after existing tasks finish'
 python3 -m venv --copies "$SSMO_PROJECT_ROOT/.venv"
 ssmo_check_venv
 "$SSMO_PYTHON" -m pip install --requirement "$SSMO_PROJECT_ROOT/requirements/base.txt"

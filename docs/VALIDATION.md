@@ -170,3 +170,25 @@ queue containing only PENDING jobs at that observation. The runbook records a
 conservative four-CPU, 8-GiB, one-GPU envelope for that snapshot; checked-in free
 capacity fields stay empty because a historical observation cannot establish
 future headroom. A30 and plain L40 were not present in this supplied discovery.
+
+## Shared venv lock on network filesystems
+
+The supplied CARC log records validation job `12617610` failing before tests
+with `flock: 9: Bad file descriptor`. It was scheduled after successful install
+job `12617609`. The task opened its lock descriptor write-only and requested a
+shared lock; network filesystem implementations that map shared flock to a
+POSIX read lock can reject this descriptor. The scripts now open the existing
+lockfile read/write without truncation. Installation remains exclusive and
+computation shared. Actual contention retains exit 3; other flock errors retain
+their distinct status and filesystem diagnostic.
+
+Three new regression checks exercise a real POSIX read lock, genuine
+shared/exclusive contention, lock lifetime through a mocked separate Slurm task,
+and a closed-descriptor error. Restoring the old write-only open in a disposable
+fixture reproduced EBADF and failed the regression. The corrected revision
+passed **116/116 CPU tests**, with zero failures, errors or skips, using an
+unchanged read-only source copy under
+`runs/ssmo-lock-audit-20261003T100613Z-214094/`. Its confirmation CLI audit exit
+code was recorded as zero and source hashes were rechecked. Mocked Slurm and
+POSIX lock checks do not establish successful execution on the CARC filesystem;
+the runbook provides a fresh smoke submission that preserves the failed run.

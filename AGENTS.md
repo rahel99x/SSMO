@@ -28,6 +28,9 @@ Do not reintroduce project pending-job caps or manual submission-slot settings.
 Other projects may enqueue concurrently. Preserve the 30-minute maximum GPU
 allocation and three reviewed free CPU/memory/GPU resource values; account queue
 freshness excludes PENDING rows. Keep queued-SSMO protection against venv changes.
+Open `local/venv.lock` read/write (`9<>`) for both shared task locks and exclusive
+installation locks; shared locks on network filesystems can reject write-only
+descriptors. Keep the lockfile inode and distinguish contention from lock errors.
 
 Retain signed atoms at continuous coordinates; never multiply an atom by cell
 width or normalize signed masses as probabilities. Nonlinear field objectives

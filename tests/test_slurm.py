@@ -2,11 +2,13 @@
 from __future__ import annotations
 
 import csv
+import fcntl
 import os
 from pathlib import Path
 import shlex
 import shutil
 import subprocess
+import sys
 import tempfile
 import time
 import unittest
@@ -460,6 +462,76 @@ printf '%s;mockcluster\\n' "$n"
         self.assertIn("venv Python version differs", result.stderr)
         self.assertNotIn("forbidden pip mutation", result.stderr)
         self.assertEqual((venv / "pyvenv.cfg").read_text(), "version = 3.11.9\n")
+
+    def test_remote_task_shared_lock_is_readable_and_held_until_exit(self):
+        real_flock = shutil.which("flock")
+        self.assertIsNotNone(real_flock)
+        self.stub("module", "exit 0\n")
+        # Slurm starts a separate task process; an allocation-shell descriptor
+        # cannot supply its lock. The stage must open its own descriptor.
+        self.stub("srun", 'exec 9>&-\nshift 2\nexec "$@"\n')
+        lock_check = self.bin / "network_flock.py"
+        lock_check.write_text(
+            "import fcntl, os, sys\n"
+            "if '-s' in sys.argv:\n"
+            "    fd = int(sys.argv[-1])\n"
+            # Shared flock on a network filesystem can use POSIX read locks.
+            # Exercise that real kernel check even on the local test filesystem.
+            "    fcntl.lockf(fd, fcntl.LOCK_SH | fcntl.LOCK_NB)\n"
+            "    fcntl.lockf(fd, fcntl.LOCK_UN)\n"
+            f"os.execv({real_flock!r}, [{real_flock!r}, *sys.argv[1:]])\n"
+        )
+        self.stub("flock", f'exec {shlex.quote(sys.executable)} {shlex.quote(str(lock_check))} "$@"\n')
+        venv = self.verified_environment()
+        interpreter = venv / "bin" / "python"
+        interpreter.write_text(
+            '#!/bin/bash\nset -euo pipefail\n'
+            'if [[ " $* " = *" pip freeze "* ]]; then printf "torch==2.10.0+cu126\\n"; exit 0; fi\n'
+            '[[ "$1 $2 $3" = "-m singular_sensitivity.cli audit" ]] || exit 99\n'
+            f'if {shlex.quote(real_flock)} -n -x "$SSMO_PROJECT_ROOT/local/venv.lock" -c true; then '
+            'printf "shared lock missing during computation\\n" >&2; exit 99; fi\n'
+            'printf "mock validation completed with shared lock\\n"\n'
+        )
+        source = self.root / "runs" / "job" / "source"
+        source.mkdir(parents=True)
+        shutil.copytree(self.root / "scripts", source / "scripts")
+        args = ["validate", str(self.root / "runs" / "job"),
+                str(self.root / "configs" / "carc_smoke.yaml"), str(source),
+                "cpu", "measure", "7", "none", "none"]
+        env = dict(self.env, SLURM_JOB_ID="22", SLURM_JOB_ACCOUNT="anakano_81")
+        result = subprocess.run(["bash", str(self.root / "slurm" / "stage.sbatch"), *args],
+                                env=env, capture_output=True, text=True)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("mock validation completed with shared lock", result.stdout)
+        released = subprocess.run([real_flock, "-n", "-x", str(self.root / "local/venv.lock"),
+                                   "-c", "true"], capture_output=True, text=True)
+        self.assertEqual(released.returncode, 0, released.stderr)
+
+    def test_shared_lock_conflict_keeps_retry_exit_status(self):
+        local = self.root / "local"
+        local.mkdir()
+        lock = local / "venv.lock"
+        helper = shlex.quote(str(self.root / "scripts" / "carc_env.sh"))
+        script = (f'source {helper}; ssmo_init_root || exit; '
+                  'exec 9<> "$SSMO_PROJECT_ROOT/local/venv.lock"; '
+                  "ssmo_lock_venv -s 'venv is being installed; retry after successful installation'")
+        with lock.open("a+") as holder:
+            fcntl.flock(holder, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            result = subprocess.run(["bash", "-c", script], env=self.env,
+                                    capture_output=True, text=True)
+        self.assertEqual(result.returncode, 3, result.stderr)
+        self.assertIn("venv is being installed", result.stderr)
+
+    def test_bad_lock_descriptor_is_not_reported_as_install_contention(self):
+        helper = shlex.quote(str(self.root / "scripts" / "carc_env.sh"))
+        script = (f'source {helper}; ssmo_init_root || exit; exec 9>&-; '
+                  "ssmo_lock_venv -s 'venv is being installed; retry after successful installation'")
+        result = subprocess.run(["bash", "-c", script], env=self.env,
+                                capture_output=True, text=True)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertNotEqual(result.returncode, 3)
+        self.assertIn("flock", result.stderr)
+        self.assertNotIn("venv is being installed", result.stderr)
 
     def test_task_scripts_are_strict_and_propagate_srun_status(self):
         for path in [*REPO.joinpath("scripts").glob("*.sh"), *REPO.joinpath("slurm").glob("*.sbatch")]:

@@ -5,6 +5,23 @@
 # nonzero logger would trigger executable strict mode before the chosen exit.
 ssmo_error() { printf 'SSMO: %s\n' "$*" >&2; }
 
+# FD 9 must be opened read/write by the caller. Network filesystems can map
+# shared flock to a POSIX read lock, which rejects a write-only descriptor.
+ssmo_lock_venv() {
+    local mode=${1:?lock mode required} busy_message=${2:?busy message required} status
+    if flock -n -E 3 "$mode" 9; then
+        return 0
+    else
+        status=$?
+    fi
+    if (( status == 3 )); then
+        ssmo_error "$busy_message"
+    else
+        ssmo_error "cannot acquire venv lock (flock exit $status); check project filesystem locking"
+    fi
+    return "$status"
+}
+
 ssmo_init_root() {
     # SSMO_ROOT is a legacy project-specific alias; never read PROJECT_ROOT.
     if [[ -n ${SSMO_PROJECT_ROOT:-} && -n ${SSMO_ROOT:-} && "$SSMO_PROJECT_ROOT" != "$SSMO_ROOT" ]]; then

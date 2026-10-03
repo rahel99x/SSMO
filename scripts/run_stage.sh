@@ -21,9 +21,9 @@ ssmo_mkdir "$run_dir/artifacts"
 # All jobs share one project venv. Locks protect active tasks. Queue checks and
 # a per-run freeze comparison protect pending stages from backend changes.
 ssmo_path "$SSMO_PROJECT_ROOT/local/venv.lock" >/dev/null
-exec 9> "$SSMO_PROJECT_ROOT/local/venv.lock"
+exec 9<> "$SSMO_PROJECT_ROOT/local/venv.lock"
 if [[ "$stage" = install ]]; then
-    flock -n -x 9 || { ssmo_error 'venv is in use; retry install after those tasks finish'; exit 3; }
+    ssmo_lock_venv -x 'venv is in use; retry install after those tasks finish'
     queued_names=$(squeue -h -u aadaniel -o '%j')
     run_id=$(basename -- "$run_dir")
     other_jobs=$(printf '%s\n' "$queued_names" | awk -v own="SSMO-$run_id-" '/^SSMO-/ && index($0, own) != 1 {n++} END {print n+0}')
@@ -49,7 +49,7 @@ if [[ "$stage" = install ]]; then
     ssmo_environment_signature "${SSMO_PYTHON_MODULE:-python/3.12.8}" "$source_dir" "$backend" > "$SSMO_PROJECT_ROOT/.venv/ssmo-environment-signature.txt"
     exit 0
 fi
-flock -n -s 9 || { ssmo_error 'venv is being installed; retry after successful installation'; exit 3; }
+ssmo_lock_venv -s 'venv is being installed; retry after successful installation'
 ssmo_check_venv "${SSMO_PYTHON_MODULE:-python/3.12.8}"
 expected_freeze="$run_dir/artifacts/dependency-freeze.txt"
 if [[ ! -f "$expected_freeze" ]]; then

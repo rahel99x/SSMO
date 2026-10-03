@@ -288,6 +288,43 @@ successful IDs. Never cancel all jobs belonging to the account or user.
 Periodic checkpoints remain necessary because advance signal delivery has not
 been verified on CARC.
 
+If validation stops with `flock: 9: Bad file descriptor`, the earlier Bash
+implementation opened the lock write-only before requesting a shared lock.
+Network filesystem read locks can reject that descriptor. The corrected scripts
+open it read/write without truncating it and distinguish actual lock contention
+from descriptor/filesystem errors. Keep `local/venv.lock`: removing the file can
+allow two processes to lock different inodes and bypass protection.
+
+For the reported validation failure `12617610` in `ssmo-smoke-001`, preserve the
+original run and use a fresh source snapshot after pulling the correction:
+
+```bash
+cd /home1/aadaniel/projects/SSMO
+git pull --ff-only
+export SSMO_PROJECT_ROOT="$PWD"
+unset SSMO_ROOT
+
+mapfile -t ssmo_blocked_jobs < <(
+  awk -F '\t' -v failed=12617610 \
+    'NR>1 && ($5 == failed || blocked[$5]) {blocked[$4]=1; print $4}' \
+    runs/ssmo-smoke-001/jobs.tsv
+)
+if (( ${#ssmo_blocked_jobs[@]} )); then
+  scancel --state=PENDING "${ssmo_blocked_jobs[@]}"
+fi
+
+bash scripts/carc.sh smoke --run-id ssmo-smoke-002 \
+  --account-free-cpus 4 --account-free-mem-gb 8 --account-free-gpus 1 --submit
+bash scripts/carc.sh status --run-id ssmo-smoke-002
+```
+
+The cancellation targets only pending descendants recorded in this failed
+pipeline. Its installation completed successfully because validation started
+through `afterok`; the frontend reuses the verified environment. Refresh the
+reviewed resource values if current allocations changed. This failure preceded
+data generation and training, so restart the smoke rather than resume from a
+checkpoint. A Git pull does not modify the failed run's frozen source.
+
 The low-level `scripts/submit.sh` remains available for individual stages and
 explicit advanced flags. Use `bash scripts/carc.sh --help` for the normal path.
 Before performance or research claims, pass held-out raw-query accuracy and
