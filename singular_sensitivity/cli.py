@@ -35,6 +35,8 @@ def _parser() -> argparse.ArgumentParser:
             sub.add_argument("--state-only-checkpoint")
         if command == "gpu-audit":
             sub.add_argument("--expected-model", required=True)
+        if command == "report":
+            sub.add_argument("--artifact-source", help="Existing project-contained artifacts to include without modifying them")
         if command in {"train", "evaluate", "inverse"}:
             sub.add_argument("--device", choices=["cpu", "cuda:0"])
     return parser
@@ -69,21 +71,47 @@ def _plan(config: dict) -> dict:
             "submission": "none; scripts/submit.sh has a separate explicit --submit mode"}
 
 
-def _report(run_dir: Path) -> dict:
+def _report(run_dir: Path, artifact_source: str | Path | None = None) -> dict:
+    run_dir = confined_path(run_dir)
+    sources = []
+    excluded = {"source", ".cache", ".venv", ".git", "local", "__pycache__"}
+    if artifact_source is not None:
+        source = confined_path(artifact_source)
+        if not source.is_dir():
+            raise ValueError("Report artifact source must be an existing project-contained directory")
+        if source.name in excluded:
+            raise ValueError("Report artifact source cannot be a source snapshot or cache directory")
+        sources.append(source)
+    if run_dir not in sources:
+        sources.append(run_dir)
     artifacts = []
-    for path in sorted(run_dir.rglob("*.json")):
-        if "source" in path.relative_to(run_dir).parts or path.name in {"parents.json", "provenance.json", "report.json"}:
-            continue
-        confined_path(path)
-        try:
-            value = json.loads(path.read_text())
-        except (OSError, json.JSONDecodeError):
-            continue
-        if isinstance(value, dict):
-            artifacts.append({"path": str(path.relative_to(run_dir)), "status": value.get("status"),
-                              "steps_completed": value.get("steps_completed"), "summary": value})
+    seen = set()
+    for source in sources:
+        # Prune source snapshots and caches before walking them. Never follow
+        # directory symlinks; validate paths before reading individual files.
+        for directory, children, files in os.walk(source, followlinks=False):
+            children[:] = sorted(name for name in children if name not in excluded)
+            for name in children:
+                confined_path(Path(directory) / name)
+            for name in sorted(files):
+                if not name.endswith(".json") or name in {"parents.json", "provenance.json", "report.json"}:
+                    continue
+                path = Path(directory) / name
+                canonical = confined_path(path)
+                if canonical in seen:
+                    continue
+                seen.add(canonical)
+                try:
+                    value = json.loads(canonical.read_text())
+                except (OSError, json.JSONDecodeError):
+                    continue
+                if isinstance(value, dict):
+                    artifacts.append({"source_directory": str(source), "path": str(path.relative_to(source)),
+                                      "status": value.get("status"), "steps_completed": value.get("steps_completed"),
+                                      "summary": value})
     report = {"status": "collected", "artifacts": artifacts,
-              "claims": {"current_instance_artifacts_only": True, "carc_jobs_validated": False,
+              "artifact_sources": [str(source) for source in sources],
+              "claims": {"current_instance_artifacts_only": sources == [run_dir], "carc_jobs_validated": False,
                          "research_advantage_established": False,
                          "note": "Parent job/accounting results and hardware-stratified held-out tolerance/cost gates need an actual CARC run."}}
     atomic_write_json(run_dir / "report.json", report)
@@ -122,7 +150,7 @@ def main(argv=None) -> int:
         elif args.command == "train":
             from .training import train
             import torch
-            torch.set_num_threads(int(config.get("threads", 1)))
+            torch.set_num_threads(threads)
             effective = copy.deepcopy(config)
             effective["device"] = device
             effective["method"] = args.method
@@ -133,6 +161,8 @@ def main(argv=None) -> int:
             config = effective
         elif args.command == "evaluate":
             from .validation import evaluate
+            import torch
+            torch.set_num_threads(threads)
             atomic_write_json(run_dir / "hardware.json", hardware_audit(device))
             result = evaluate(config, dataset, run_dir, checkpoint=confined_path(args.checkpoint), device=device,
                               state_only_checkpoint=confined_path(args.state_only_checkpoint) if args.state_only_checkpoint else None)
@@ -153,6 +183,7 @@ def main(argv=None) -> int:
             if args.checkpoint:
                 import numpy as np
                 import torch
+                torch.set_num_threads(threads)
                 from .training import load_model
                 from .models import chart_measure, squared_objective_gradient
                 atomic_write_json(run_dir / "hardware.json", hardware_audit(device))
@@ -171,7 +202,7 @@ def main(argv=None) -> int:
                                       learning_rate=float(options.get("lr", 0.1)), gradient_provider=provider)
             atomic_write_json(run_dir / "inverse.json", result)
         elif args.command == "report":
-            result = _report(run_dir)
+            result = _report(run_dir, args.artifact_source)
         else:
             raise AssertionError("Unhandled stage")
         record = provenance(config, dataset)

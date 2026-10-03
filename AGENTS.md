@@ -19,6 +19,11 @@ allocations and `srun`, explicit `--account=anakano_81`, and root
 `/home1/aadaniel/projects/SSNO`. Read docs/CARC_RUNBOOK.md before deployment.
 Preparing scripts does not authorize live submissions. `submit.sh` is dry-run
 by default; preserve Slurm's `CUDA_VISIBLE_DEVICES` and use `cuda:0`.
+Use `scripts/carc.sh` for normal CARC discovery/setup/smoke/pilot/status/recovery.
+It reads project-local site settings, captures fresh policy for live actions,
+and reuses only a verified Python 3.12.8 CUDA environment. Never guess free
+shared-account capacities. Read docs/CONFIG_TUNING.md before modifying presets;
+selection uses independent validation, with no retuning on sealed test results.
 
 Retain signed atoms at continuous coordinates; never multiply an atom by cell
 width or normalize signed masses as probabilities. Nonlinear field objectives

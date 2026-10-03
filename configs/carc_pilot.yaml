@@ -1,10 +1,10 @@
 schema_version: 1
-name: ssmo-carc-bounded-pilot
+name: ssmo-carc-validation-tuned-pilot
 domain: [-2.0, 2.0]
 device: cuda:0
 precision: fp32
 compile: false
-threads: 2
+threads: 1
 data:
   seed: 1729
   train_parents: 512
@@ -17,14 +17,16 @@ training:
   steps: 500
   batch_size: 32
   directions_per_parent: 3
-  lr: 0.001
-  width: 64
-  depth: 3
+  # Bounded CPU validation-only search; see docs/CONFIG_TUNING.md.
+  # These are starter settings, not a measured CARC/GPU optimum.
+  lr: 0.003
+  width: 32
+  depth: 2
   eval_every: 25
   patience: 6
-  min_delta: 0.000001
+  min_delta: 0.00000001
   checkpoint_every: 50
-  max_seconds: 1200
+  max_seconds: 300
   loss_weights: {weak: 1.0, state: 1.0, support: 0.1, weights: 0.1, tv: 0.000001}
 evaluation:
   max_parents: 64

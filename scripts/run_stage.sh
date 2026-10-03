@@ -2,7 +2,7 @@
 set -euo pipefail
 source "$(dirname -- "${BASH_SOURCE[0]}")/carc_env.sh"
 ssmo_env
-[[ $# = 9 ]] || { ssmo_error 'internal stage interface requires stage run config source profile method seed manifest checkpoint'; exit 2; }
+[[ $# = 9 || $# = 10 ]] || { ssmo_error 'internal stage interface requires stage run config source profile method seed manifest checkpoint [report-source]'; exit 2; }
 stage=$1
 run_dir=$(ssmo_path "$2")
 config=$(ssmo_path "$3")
@@ -12,6 +12,7 @@ method=$6
 seed=$7
 manifest=$8
 checkpoint=$9
+report_source=${10:-none}
 [[ -f "$config" && -d "$source_dir" ]] || { ssmo_error 'frozen source/config missing'; exit 2; }
 ssmo_load_python
 export PYTHONPATH="$source_dir"
@@ -31,7 +32,7 @@ if [[ "$stage" = install ]]; then
     if [[ ! -f "$SSMO_PROJECT_ROOT/.venv/pyvenv.cfg" ]]; then
         python3 -m venv --copies "$SSMO_PROJECT_ROOT/.venv"
     fi
-    ssmo_check_venv
+    ssmo_check_venv "${SSMO_PYTHON_MODULE:-python/3.12.8}"
     "$SSMO_PYTHON" -m pip install --requirement "$source_dir/requirements/base.txt"
     if [[ "$profile" = cpu ]]; then
         "$SSMO_PYTHON" -m pip install --index-url https://download.pytorch.org/whl/cpu --requirement "$source_dir/requirements/cpu.txt"
@@ -43,10 +44,13 @@ if [[ "$stage" = install ]]; then
     ssmo_path "$SSMO_PROJECT_ROOT/.venv/ssmo-dependency-freeze.txt" >/dev/null
     cp -- "$run_dir/artifacts/dependency-freeze.txt" "$SSMO_PROJECT_ROOT/.venv/ssmo-dependency-freeze.txt"
     "$SSMO_PYTHON" -m pip list --format=json > "$run_dir/artifacts/installed-versions.json"
+    ssmo_path "$SSMO_PROJECT_ROOT/.venv/ssmo-environment-signature.txt" >/dev/null
+    backend=cuda; [[ "$profile" != cpu ]] || backend=cpu
+    ssmo_environment_signature "${SSMO_PYTHON_MODULE:-python/3.12.8}" "$source_dir" "$backend" > "$SSMO_PROJECT_ROOT/.venv/ssmo-environment-signature.txt"
     exit 0
 fi
 flock -n -s 9 || { ssmo_error 'venv is being installed; retry after successful installation'; exit 3; }
-ssmo_check_venv
+ssmo_check_venv "${SSMO_PYTHON_MODULE:-python/3.12.8}"
 expected_freeze="$run_dir/artifacts/dependency-freeze.txt"
 if [[ ! -f "$expected_freeze" ]]; then
     # A manually linked first-install predecessor creates this marker later.
@@ -94,7 +98,10 @@ case "$stage" in
         args=(inverse --config "$config" --run-dir "$run_dir/artifacts/inverse" --device cpu)
         if [[ "$checkpoint" != none && -f "$checkpoint" ]]; then args+=(--checkpoint "$(ssmo_path "$checkpoint")"); fi
         "$SSMO_PYTHON" -m singular_sensitivity.cli "${args[@]}"
-        "$SSMO_PYTHON" -m singular_sensitivity.cli report --config "$config" --run-dir "$run_dir/artifacts"
+        bash "$source_dir/scripts/compact_logs.sh" "$run_dir"
+        args=(report --config "$config" --run-dir "$run_dir/artifacts")
+        if [[ "$report_source" != none ]]; then args+=(--artifact-source "$(ssmo_path "$report_source")"); fi
+        "$SSMO_PYTHON" -m singular_sensitivity.cli "${args[@]}"
         ;;
     *) ssmo_error "unknown stage: $stage"; exit 2 ;;
 esac

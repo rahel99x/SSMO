@@ -6,7 +6,7 @@ using the project-local `.venv`. `pip check` passed. The standalone local setup
 script was exercised against the installed environment; it uses verified
 official package indexes, copied venv interpreters and confined caches.
 
-## Observed outcomes
+## Initial implementation outcomes
 
 | Check | Result |
 |---|---|
@@ -79,3 +79,49 @@ storage outside the approved directory before creating files. Mocked Slurm
 fixtures now use project-confined storage instead of inheriting `TMPDIR`.
 The dependency check and submission preview also passed; this remains local
 validation, with no live CARC submission.
+
+## Automated workflow and preset selection
+
+The next revision adds the Bash frontend for discovery, allocated setup,
+smoke/pilot submission, status and recovery, plus verified reuse of the pinned
+Python 3.12.8 CUDA venv. Site headroom remains explicitly reviewed; neither this
+cloud instance nor mocked scheduler tests can establish shared-account capacity.
+Completed raw evaluation logs are losslessly compressed inside the allocated
+report stage; source runs, training logs and checkpoints are preserved.
+
+The final CPU audit executed **107 tests: 107 passed, zero failures, errors,
+skips or expected failures** from an unchanged read-only source copy under
+`runs/ssmo-automation-audit-20261003T070415Z-140623/`. `pip check` passed.
+This includes 24 mocked low-level Slurm tests, 18 frontend tests, eight report
+checks, ten lossless-compaction checks and four validation-selection checks.
+Real Bash previews for setup/smoke/pilot produced 3/7/9 correctly accounted
+jobs with module `python/3.12.8` and L40S requests; no run directories or jobs
+were created by those previews. Verified venv reuse removes one installation
+job from each chain.
+
+The first frozen-copy audit exposed a test-fixture permission error: copied
+requirements were still read-only during a deliberate dependency-drift test.
+Only that disposable fixture's mode was corrected; the preserved failed audit
+and subsequent clean audit both left their source copies unchanged.
+
+A bounded CPU validation-only search selected width 32, depth two, learning rate
+0.003 and batch 32. Two initialization seeds confirmed the selection: 1,315
+parameters, 24.14-second mean complete CPU invocation and approximately 355 MiB
+maximum RSS. The search, including an excluded failed draft, took 287.89 seconds.
+The selected preset reduces the training application cap to 300 seconds while
+retaining conservative Slurm resource headroom. See [CONFIG_TUNING.md](CONFIG_TUNING.md)
+for the criterion, complete trial table and measured limitations.
+
+One independent assessment then used the frozen preset without retuning.
+All 31 IID test and 30 range-holdout supported parents passed the 0.01 weak-query
+gate; the fixed audit shock failed at 0.01181979. Thus 61/62 supported parents
+passed, but the complete gate remains unmet. The largest nonlinear-gradient error
+was 0.04996314; the classical control remained more accurate. Exact collision
+records remain unresolved. No global or GPU-specific optimum, research advantage
+or actual CARC execution is established.
+
+The selected search records are preserved under `runs/ssmo-config-tuning-002/`
+and the independent assessment under `runs/ssmo-heldout-assessment-002/`.
+Verified level-one gzip reduced the latter directory from approximately 72.54 MB
+to 7.05 MB while retaining every raw record, original summary and checksum
+receipt. Generated runs remain ignored by Git; aggregate evidence is committed.

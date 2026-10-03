@@ -95,6 +95,70 @@ printf '%s;mockcluster\\n' "$n"
         return subprocess.run(["bash", str(self.root / "scripts" / "submit.sh"), *flags, *args],
                               env=self.env, text=True, capture_output=True)
 
+    def verified_environment(self):
+        shutil.copytree(REPO / "requirements", self.root / "requirements")
+        venv = self.root / ".venv"
+        (venv / "bin").mkdir(parents=True)
+        (venv / "pyvenv.cfg").write_text("version = 3.12.8\n")
+        interpreter = venv / "bin" / "python"
+        interpreter.write_text("#!/bin/bash\nexit 0\n")
+        interpreter.chmod(0o700)
+        (venv / "ssmo-dependency-freeze.txt").write_text("torch==2.10.0+cu126\n")
+        helper = shlex.quote(str(self.root / "scripts" / "carc_env.sh"))
+        result = subprocess.run(["bash", "-c", f"source {helper}; ssmo_init_root && ssmo_environment_signature python/3.12.8"],
+                                env=self.env, text=True, capture_output=True)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        (venv / "ssmo-environment-signature.txt").write_text(result.stdout)
+        return venv
+
+    def test_setup_allocates_only_install_validation_and_gpu_audit(self):
+        result = self.run_wrapper("--pipeline", "setup", live=True)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        with (self.root / "runs/fixture/jobs.tsv").open() as stream:
+            rows = list(csv.DictReader(stream, delimiter="\t"))
+        self.assertEqual([row["stage"] for row in rows], ["install", "validate", "gpu-smoke"])
+        self.assertEqual(rows[-1]["dependency"], rows[-2]["job_id"])
+
+    def test_environment_reuse_omits_install_and_rejects_dependency_drift(self):
+        self.verified_environment()
+        result = self.run_wrapper("--skip-install", live=True)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        with (self.root / "runs/fixture/jobs.tsv").open() as stream:
+            rows = list(csv.DictReader(stream, delimiter="\t"))
+        self.assertEqual(len(rows), 6)
+        self.assertEqual(rows[0]["stage"], "validate")
+        self.assertNotIn("install", [row["stage"] for row in rows])
+        # Allocated audits copy read-only sources. Change only the disposable
+        # fixture's file mode before deliberately simulating requirement drift.
+        (self.root / "requirements/base.txt").chmod(0o600)
+        (self.root / "requirements/base.txt").write_text("numpy==0.0.0\n")
+        before = self.calls.read_text()
+        result = self.run_wrapper("--run-id", "drift", "--skip-install", live=True)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("environment unavailable or changed", result.stderr)
+        self.assertEqual(self.calls.read_text(), before)
+
+    def test_reuse_refuses_missing_marker_wrong_python_or_cpu_wheel(self):
+        result = self.run_wrapper("--skip-install")
+        self.assertNotEqual(result.returncode, 0)
+        venv = self.verified_environment()
+        for name, content in [("pyvenv.cfg", "version = 3.11.9\n"),
+                              ("ssmo-dependency-freeze.txt", "torch==2.10.0+cpu\n")]:
+            with self.subTest(name=name):
+                original = (venv / name).read_text()
+                (venv / name).write_text(content)
+                result = self.run_wrapper("--skip-install", live=True)
+                self.assertNotEqual(result.returncode, 0)
+                self.assertFalse(self.calls.exists())
+                (venv / name).write_text(original)
+
+    def test_missing_requirements_propagate_signature_failure(self):
+        helper = shlex.quote(str(self.root / "scripts" / "carc_env.sh"))
+        result = subprocess.run(["bash", "-c", f"source {helper}; ssmo_init_root && ssmo_environment_signature"],
+                                env=self.env, text=True, capture_output=True)
+        self.assertNotEqual(result.returncode, 0)
+
+
     def test_dry_run_has_exact_account_resources_and_does_not_mutate(self):
         result = self.run_wrapper("--after", "77")
         self.assertEqual(result.returncode, 0, result.stderr)
@@ -287,7 +351,7 @@ printf '%s;mockcluster\\n' "$n"
         self.stub("module", "exit 0\n")
         venv = self.root / ".venv"
         (venv / "bin").mkdir(parents=True)
-        (venv / "pyvenv.cfg").write_text("home = mock-module\n")
+        (venv / "pyvenv.cfg").write_text("home = mock-module\nversion = 3.12.8\n")
         interpreter = venv / "bin" / "python"
         interpreter.write_text('#!/bin/bash\nif [[ " $* " = *" pip freeze "* ]]; then printf "torch==2.10.0+cpu\\n"; else printf "forbidden computation\\n" >&2; exit 99; fi\n')
         interpreter.chmod(0o700)
@@ -312,6 +376,23 @@ printf '%s;mockcluster\\n' "$n"
         self.assertEqual(result.returncode, 3, result.stderr)
         self.assertIn("other SSMO jobs", result.stderr)
         self.assertFalse((self.root / ".venv").exists())
+
+    def test_install_refuses_wrong_python_before_any_pip_mutation(self):
+        self.stub("module", "exit 0\n")
+        venv = self.verified_environment()
+        (venv / "pyvenv.cfg").write_text("version = 3.11.9\n")
+        interpreter = venv / "bin" / "python"
+        interpreter.write_text('#!/bin/bash\nprintf "forbidden pip mutation\\n" >&2\nexit 99\n')
+        run = self.root / "runs" / "runtime"
+        run.mkdir()
+        args = ["install", str(run), str(self.root / "configs" / "carc_smoke.yaml"),
+                str(self.root), "a10040", "measure", "17", "none", "none"]
+        result = subprocess.run(["bash", str(self.root / "scripts" / "run_stage.sh"), *args],
+                                env=self.env, text=True, capture_output=True)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("venv Python version differs", result.stderr)
+        self.assertNotIn("forbidden pip mutation", result.stderr)
+        self.assertEqual((venv / "pyvenv.cfg").read_text(), "version = 3.11.9\n")
 
     def test_task_scripts_are_strict_and_propagate_srun_status(self):
         for path in [*REPO.joinpath("scripts").glob("*.sh"), *REPO.joinpath("slurm").glob("*.sbatch")]:

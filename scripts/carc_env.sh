@@ -102,8 +102,51 @@ ssmo_load_python() {
 }
 
 ssmo_check_venv() {
-    local canonical
+    local canonical version selected=${1:-}
     canonical=$(ssmo_path .venv/bin/python) || return 1
     [[ -x "$canonical" && -f "$SSMO_PROJECT_ROOT/.venv/pyvenv.cfg" ]] || { ssmo_error 'project venv missing; run install stage'; return 1; }
     ssmo_check_tree "$SSMO_PROJECT_ROOT/.venv" || return 1
+    if [[ -n "$selected" ]]; then
+        version=$(awk -F' = ' '$1 == "version" {print $2}' "$SSMO_PROJECT_ROOT/.venv/pyvenv.cfg")
+        [[ "$version" = "${selected#python/}" ]] || {
+            ssmo_error 'venv Python version differs from requested module; preserve it inside SSNO and create a fresh environment after all tasks finish'
+            return 1
+        }
+    fi
+}
+
+# Read-only readiness checks work on the login node without starting Python.
+ssmo_environment_signature() {
+    (
+        set -o pipefail
+        local selected=${1:-${SSMO_PYTHON_MODULE:-python/3.12.8}}
+        local source_root=${2:-$SSMO_PROJECT_ROOT} backend=${3:-cuda} location wheel_file=carc-cu126.txt
+        [[ "$selected" =~ ^python/[A-Za-z0-9._+-]+$ && ( "$backend" = cuda || "$backend" = cpu ) ]] || exit 1
+        source_root=$(ssmo_path "$source_root") || exit 1
+        [[ "$backend" != cpu ]] || wheel_file=cpu.txt
+        {
+            printf '%s\n%s\n' "$selected" "$backend"
+            for location in base.txt "$wheel_file"; do
+                location=$(ssmo_path "$source_root/requirements/$location") || exit 1
+                [[ -f "$location" ]] || exit 1
+                sha256sum "$location" | awk '{print $1}' || exit 1
+            done
+        } | sha256sum | awk '{print $1}'
+    )
+}
+
+ssmo_environment_ready() {
+    local selected=${1:-${SSMO_PYTHON_MODULE:-python/3.12.8}} location expected actual version
+    for location in .venv/pyvenv.cfg .venv/bin/python .venv/ssmo-dependency-freeze.txt .venv/ssmo-environment-signature.txt; do
+        location=$(ssmo_path "$location") || return 1
+        [[ -f "$location" ]] || return 1
+    done
+    [[ -x "$SSMO_PROJECT_ROOT/.venv/bin/python" ]] || return 1
+    ssmo_check_tree "$SSMO_PROJECT_ROOT/.venv" || return 1
+    version=$(awk -F' = ' '$1 == "version" {print $2}' "$SSMO_PROJECT_ROOT/.venv/pyvenv.cfg")
+    [[ "$version" = "${selected#python/}" ]] || return 1
+    expected=$(ssmo_environment_signature "$selected") || return 1
+    actual=$(cat "$SSMO_PROJECT_ROOT/.venv/ssmo-environment-signature.txt") || return 1
+    [[ "$actual" = "$expected" ]] || return 1
+    grep -Fxq 'torch==2.10.0+cu126' "$SSMO_PROJECT_ROOT/.venv/ssmo-dependency-freeze.txt" || return 1
 }

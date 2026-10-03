@@ -12,6 +12,8 @@ after=
 resume=none
 manifest=
 checkpoint=
+report_source=none
+skip_install=0
 method=measure
 seed=17
 discovery=
@@ -24,10 +26,11 @@ python_module=python/3.12.8
 usage() {
     cat <<'USAGE'
 Usage: scripts/submit.sh [--config PATH] [--run-id ID] [--submit]
-  [--pipeline smoke|pilot | --stage install|validate|data|gpu-smoke|train|evaluate|report]
+  [--pipeline setup|smoke|pilot | --stage install|validate|data|gpu-smoke|train|evaluate|report]
   [--gpu-profile a10040|a40|a30|l40|l40s|cpu] [--method measure|state_only] [--seed N]
   [--after JOBID] [--resume CHECKPOINT] [--manifest PATH] [--checkpoint PATH]
   [--discovery ID] [--python-module python/VERSION] [--max-project-jobs N]
+  [--skip-install] [--report-from ARTIFACT_DIRECTORY]
 Live submissions require reviewed current account free capacity:
   --account-slots N --account-free-cpus N --account-free-mem-gb N --account-free-gpus N
 Dry-run is the default and does not create directories or submit jobs.
@@ -38,7 +41,8 @@ while (( $# )); do
         --help|-h) usage; exit 0 ;;
         --submit) submit=1; shift; continue ;;
         --dry-run) submit=0; shift; continue ;;
-        --config|--run-id|--pipeline|--stage|--gpu-profile|--method|--seed|--after|--resume|--manifest|--checkpoint|--discovery|--python-module|--max-project-jobs|--account-slots|--account-free-cpus|--account-free-mem-gb|--account-free-gpus)
+        --skip-install) skip_install=1; shift; continue ;;
+        --config|--run-id|--pipeline|--stage|--gpu-profile|--method|--seed|--after|--resume|--manifest|--checkpoint|--report-from|--discovery|--python-module|--max-project-jobs|--account-slots|--account-free-cpus|--account-free-mem-gb|--account-free-gpus)
             (( $# >= 2 )) || { ssmo_error "missing value for $1"; exit 2; }
             flag=$1 value=$2
             case "$flag" in
@@ -46,6 +50,7 @@ while (( $# )); do
                 --stage) single_stage=$value ;; --gpu-profile) profile=$value ;; --method) method=$value ;;
                 --seed) seed=$value ;; --after) after=$value ;; --resume) resume=$value ;;
                 --manifest) manifest=$value ;; --checkpoint) checkpoint=$value ;;
+                --report-from) report_source=$value ;;
                 --discovery) discovery=$value ;; --python-module) python_module=$value ;;
                 --max-project-jobs) max_project_jobs=$value ;; --account-slots) account_slots=$value ;;
                 --account-free-cpus) free_cpus=$value ;; --account-free-mem-gb) free_mem=$value ;;
@@ -56,7 +61,7 @@ while (( $# )); do
     esac
 done
 [[ "$run_id" =~ ^[A-Za-z0-9][A-Za-z0-9_-]{0,79}$ ]] || { ssmo_error 'invalid run ID'; exit 2; }
-[[ "$pipeline" = smoke || "$pipeline" = pilot ]] || { ssmo_error 'pipeline must be smoke or pilot'; exit 2; }
+[[ "$pipeline" = setup || "$pipeline" = smoke || "$pipeline" = pilot ]] || { ssmo_error 'pipeline must be setup, smoke or pilot'; exit 2; }
 [[ "$method" = measure || "$method" = state_only ]] || { ssmo_error 'invalid method'; exit 2; }
 [[ "$seed" =~ ^[0-9]+$ && "$max_project_jobs" =~ ^[1-9][0-9]*$ ]] || { ssmo_error 'invalid seed/job bound'; exit 2; }
 [[ -z "$after" || "$after" =~ ^[0-9]+$ ]] || { ssmo_error 'after must be one real job ID'; exit 2; }
@@ -76,6 +81,15 @@ if [[ "$resume" != none ]]; then
     resume=$(ssmo_path "$resume")
     [[ -f "$resume" && "$single_stage" = train ]] || { ssmo_error 'resume requires --stage train and an existing checkpoint'; exit 2; }
 fi
+if [[ "$report_source" != none ]]; then
+    report_source=$(ssmo_path "$report_source")
+    [[ -d "$report_source" && "$single_stage" = report ]] || { ssmo_error '--report-from requires an existing artifact directory and --stage report'; exit 2; }
+    ssmo_check_tree "$report_source"
+fi
+if (( skip_install )); then
+    [[ -z "$single_stage" ]] || { ssmo_error '--skip-install applies only to pipelines'; exit 2; }
+    ssmo_environment_ready "$python_module" || { ssmo_error 'verified CUDA environment unavailable or changed; run setup before skipping installation'; exit 2; }
+fi
 stages=()
 methods=()
 if [[ -n "$single_stage" ]]; then
@@ -87,10 +101,16 @@ if [[ -n "$single_stage" ]]; then
     if [[ "$single_stage" = evaluate ]]; then [[ -f "$checkpoint" || -n "$after" ]] || { ssmo_error 'evaluation checkpoint missing without an explicit predecessor'; exit 2; }; fi
 else
     [[ "$profile" != cpu ]] || { ssmo_error 'full pipeline uses an allocated GPU; use CPU --stage for CPU-only stages'; exit 2; }
-    stages=(install validate data gpu-smoke train evaluate)
-    methods=(measure measure measure measure measure measure)
-    if [[ "$pipeline" = pilot ]]; then stages+=(train evaluate); methods+=(state_only state_only); fi
-    stages+=(report); methods+=(measure)
+    if (( ! skip_install )); then stages+=(install); methods+=(measure); fi
+    stages+=(validate); methods+=(measure)
+    if [[ "$pipeline" = setup ]]; then
+        stages+=(gpu-smoke); methods+=(measure)
+    else
+        stages+=(data gpu-smoke train evaluate)
+        methods+=(measure measure measure measure)
+        if [[ "$pipeline" = pilot ]]; then stages+=(train evaluate); methods+=(state_only state_only); fi
+        stages+=(report); methods+=(measure)
+    fi
 fi
 num_stages=${#stages[@]}
 (( num_stages <= max_project_jobs )) || { ssmo_error "pipeline has $num_stages jobs; max-project-jobs=$max_project_jobs"; exit 2; }
@@ -203,6 +223,7 @@ if (( submit )); then
     fi
     cp -a "$discovery_dir" "$run_dir/discovery"
     printf 'run_id=%s\nssmo_project_root=%s\nconfig=%s\nprofile=%s\npython_module=%s\npipeline=%s\nmax_project_jobs=%s\naccount_slots=%s\nfree_cpus=%s\nfree_mem_gb=%s\nfree_gpus=%s\n' "$run_id" "$SSMO_PROJECT_ROOT" "$config" "$profile" "$python_module" "$pipeline" "$max_project_jobs" "$account_slots" "$free_cpus" "$free_mem" "$free_gpus" > "$run_dir/submission-manifest.txt"
+    printf 'method=%s\nseed=%s\nmanifest=%s\ncheckpoint=%s\nresume=%s\nreport_source=%s\nskip_install=%s\n' "$method" "$seed" "$manifest" "$checkpoint" "$resume" "$report_source" "$skip_install" >> "$run_dir/submission-manifest.txt"
     chmod -R a-w "$source_dir"
     chmod a-w "$frozen_config"
     printf 'stage\tmethod\tseed\tjob_id\tdependency\n' > "$run_dir/jobs.tsv"
@@ -219,6 +240,7 @@ for index in "${!stages[@]}"; do
     [[ -z "$dependency" ]] || cmd+=("--dependency=afterok:$dependency")
     cmd+=("$source_dir/slurm/stage.sbatch" "$stage" "$run_dir" "$frozen_config" "$source_dir" "$profile" "$this_method" "$seed" "$manifest")
     if [[ "$stage" = train ]]; then cmd+=("$resume"); else cmd+=("$this_checkpoint"); fi
+    cmd+=("$report_source")
     if (( submit )); then
         printf '%q ' "${cmd[@]}" > "$run_dir/logs/submission-$stage-$this_method.command"
         printf '\n' >> "$run_dir/logs/submission-$stage-$this_method.command"

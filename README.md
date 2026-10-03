@@ -22,7 +22,7 @@ training, systems, higher dimensions, and efficacy claims are gated extensions.
 | Representation study | Measure pairings versus grid FD and fixed physical smoothing ladders | CPU, short bounded ladders |
 | Numerical teacher audit | Conservative Godunov refinement and coupled FD error records | CPU, 128/256/512 cells |
 | Learned chart smoke | Exercise actual gradient-bearing training, validation selection, logs and checkpoints | 20 updates, one seed, width 32 |
-| Pilot | Match state-only and measure-training controls, separately per seed/hardware | 500 updates, width 64; explicit submission |
+| Pilot | Match state-only and measure-training controls, separately per seed/hardware | Validation-selected width 32, depth 2, 500 updates, 300-second application cap |
 | Evaluation/inverse | Raw held-out query errors, parent-level statistics, classical/grid controls, BL LP diagnostics and trusted objective checks | Bounded parent and LP counts |
 
 Neither a successful smoke nor an analytic toy comparison establishes a
@@ -70,6 +70,27 @@ mkdir -p "$SSMO_RUN_DIR"
 
 For CARC use the [inline runbook](docs/CARC_RUNBOOK.md), which contains discovery,
 resource budgets, dry-run previews, explicit submissions and recovery commands.
+The Bash frontend automates these steps:
+
+```bash
+bash scripts/carc.sh discover --run-id ssmo-policy-001
+# Review policy/capacity and fill local/carc_site.env from configs/carc_site.env.
+bash scripts/carc.sh setup --run-id ssmo-setup-001 --submit
+bash scripts/carc.sh status --run-id ssmo-setup-001
+# After setup succeeds:
+bash scripts/carc.sh smoke --run-id ssmo-smoke-001 --submit
+bash scripts/carc.sh status --run-id ssmo-smoke-001
+# After checking the smoke:
+bash scripts/carc.sh pilot --run-id ssmo-pilot-001 --submit
+```
+
+Omit `--submit` to preview. Live actions capture fresh discovery automatically,
+reuse a verified venv, and retain explicit shared-account capacity checks.
+The allocated report stage losslessly compresses completed raw JSONL with
+verified hashes and a path mapping; training logs and checkpoints remain intact.
+The [configuration evidence](docs/CONFIG_TUNING.md) describes the bounded CPU
+validation search; these are measured starter settings, not GPU-specific optima.
+
 Every allocation charges `anakano_81`; project storage is
 `/home1/aadaniel/projects/SSNO`. CPU stages use `main`; GPU stages use `gpu`.
 A100 40 GB, A40, A30, L40 and L40S are separate profiles. Only currently observed

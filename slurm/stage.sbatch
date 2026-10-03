@@ -2,7 +2,7 @@
 # Allocation, account, absolute log paths and dependency flags come from submit.sh.
 set -euo pipefail
 [[ -n ${SLURM_JOB_ID:-} ]] || { printf 'Run this task with sbatch via scripts/submit.sh\n' >&2; exit 2; }
-[[ $# = 9 ]] || { printf 'Invalid internal task arguments\n' >&2; exit 2; }
+[[ $# = 9 || $# = 10 ]] || { printf 'Invalid internal task arguments\n' >&2; exit 2; }
 source_dir=$4
 [[ "$source_dir" = /home1/aadaniel/projects/SSNO/runs/*/source ]] || { printf 'Invalid source snapshot path\n' >&2; exit 2; }
 source "$source_dir/scripts/carc_env.sh"
