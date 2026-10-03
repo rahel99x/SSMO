@@ -15,22 +15,21 @@ checkpoint=$9
 [[ -f "$config" && -d "$source_dir" ]] || { ssmo_error 'frozen source/config missing'; exit 2; }
 ssmo_load_python
 export PYTHONPATH="$source_dir"
-export SSMO_PROJECT_ROOT="$SSMO_ROOT"
 unset SSMO_EXPECTED_GPU
 ssmo_mkdir "$run_dir/artifacts"
 # All jobs share one project venv. Locks protect active tasks. Queue checks and
 # a per-run freeze comparison protect pending stages from backend changes.
-ssmo_path "$SSMO_ROOT/local/venv.lock" >/dev/null
-exec 9> "$SSMO_ROOT/local/venv.lock"
+ssmo_path "$SSMO_PROJECT_ROOT/local/venv.lock" >/dev/null
+exec 9> "$SSMO_PROJECT_ROOT/local/venv.lock"
 if [[ "$stage" = install ]]; then
     flock -n -x 9 || { ssmo_error 'venv is in use; retry install after those tasks finish'; exit 3; }
     queued_names=$(squeue -h -u aadaniel -o '%j')
     run_id=$(basename -- "$run_dir")
     other_jobs=$(printf '%s\n' "$queued_names" | awk -v own="SSMO-$run_id-" '/^SSMO-/ && index($0, own) != 1 {n++} END {print n+0}')
     (( other_jobs == 0 )) || { ssmo_error 'other SSMO jobs are queued/running; do not change their environment'; exit 3; }
-    ssmo_check_tree "$SSMO_ROOT/.venv"
-    if [[ ! -f "$SSMO_ROOT/.venv/pyvenv.cfg" ]]; then
-        python3 -m venv --copies "$SSMO_ROOT/.venv"
+    ssmo_check_tree "$SSMO_PROJECT_ROOT/.venv"
+    if [[ ! -f "$SSMO_PROJECT_ROOT/.venv/pyvenv.cfg" ]]; then
+        python3 -m venv --copies "$SSMO_PROJECT_ROOT/.venv"
     fi
     ssmo_check_venv
     "$SSMO_PYTHON" -m pip install --requirement "$source_dir/requirements/base.txt"
@@ -41,8 +40,8 @@ if [[ "$stage" = install ]]; then
     fi
     "$SSMO_PYTHON" -m pip check
     "$SSMO_PYTHON" -m pip freeze --all > "$run_dir/artifacts/dependency-freeze.txt"
-    ssmo_path "$SSMO_ROOT/.venv/ssmo-dependency-freeze.txt" >/dev/null
-    cp -- "$run_dir/artifacts/dependency-freeze.txt" "$SSMO_ROOT/.venv/ssmo-dependency-freeze.txt"
+    ssmo_path "$SSMO_PROJECT_ROOT/.venv/ssmo-dependency-freeze.txt" >/dev/null
+    cp -- "$run_dir/artifacts/dependency-freeze.txt" "$SSMO_PROJECT_ROOT/.venv/ssmo-dependency-freeze.txt"
     "$SSMO_PYTHON" -m pip list --format=json > "$run_dir/artifacts/installed-versions.json"
     exit 0
 fi
@@ -51,8 +50,8 @@ ssmo_check_venv
 expected_freeze="$run_dir/artifacts/dependency-freeze.txt"
 if [[ ! -f "$expected_freeze" ]]; then
     # A manually linked first-install predecessor creates this marker later.
-    [[ -f "$SSMO_ROOT/.venv/ssmo-dependency-freeze.txt" ]] || { ssmo_error 'environment freeze missing; run the install prerequisite'; exit 3; }
-    cp -- "$SSMO_ROOT/.venv/ssmo-dependency-freeze.txt" "$expected_freeze"
+    [[ -f "$SSMO_PROJECT_ROOT/.venv/ssmo-dependency-freeze.txt" ]] || { ssmo_error 'environment freeze missing; run the install prerequisite'; exit 3; }
+    cp -- "$SSMO_PROJECT_ROOT/.venv/ssmo-dependency-freeze.txt" "$expected_freeze"
 fi
 "$SSMO_PYTHON" -m pip freeze --all > "$run_dir/artifacts/environment-$stage-$method-seed$seed.txt"
 cmp -s "$expected_freeze" "$run_dir/artifacts/environment-$stage-$method-seed$seed.txt" || { ssmo_error 'environment changed since this run was prepared; preserve outputs and reinstall/review a new run'; exit 3; }

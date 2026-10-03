@@ -11,6 +11,7 @@ import json
 import os
 from pathlib import Path
 import platform
+import pwd
 import resource
 import subprocess
 import tempfile
@@ -18,12 +19,27 @@ import time
 from typing import Any
 
 
+CARC_PROJECT_ROOT = Path("/home1/aadaniel/projects/SSNO")
+
+
+def _check_carc_storage(base: Path) -> None:
+    if os.environ.get("SLURM_JOB_ID") or pwd.getpwuid(os.getuid()).pw_name == "aadaniel":
+        if not base.is_relative_to(CARC_PROJECT_ROOT):
+            raise ValueError(f"CARC storage must stay inside {CARC_PROJECT_ROOT}: {base}")
+
+
 def project_root() -> Path:
-    configured = os.environ.get("SSMO_PROJECT_ROOT") or os.environ.get("PROJECT_ROOT")
+    configured = os.environ.get("SSMO_PROJECT_ROOT")
+    legacy = os.environ.get("SSMO_ROOT")
+    if configured and legacy and configured != legacy:
+        raise ValueError("SSMO_PROJECT_ROOT and legacy SSMO_ROOT disagree")
+    # Never inherit the generic PROJECT_ROOT from another project.
+    configured = configured or legacy
     root = Path(configured) if configured else Path(__file__).resolve().parents[1]
     root = root.absolute()
     if not root.is_dir() or root.resolve() != root:
         raise ValueError("Project root must be an existing real directory, not an escaping symlink")
+    _check_carc_storage(root)
     return root
 
 
@@ -31,6 +47,7 @@ def confined_path(path: str | Path, root: str | Path | None = None) -> Path:
     base = Path(root).absolute() if root is not None else project_root()
     if base.resolve() != base:
         raise ValueError("Project root must not be a symlink")
+    _check_carc_storage(base)
     candidate = Path(path)
     candidate = candidate if candidate.is_absolute() else base / candidate
     resolved = candidate.resolve(strict=False)
@@ -45,6 +62,7 @@ def initialize_storage(root: Path | None = None, threads: int = 1) -> None:
     locations = {
         "TMPDIR": "tmp", "TMP": "tmp", "TEMP": "tmp", "PIP_CACHE_DIR": "pip",
         "XDG_CACHE_HOME": "xdg", "XDG_CONFIG_HOME": "xdg-config", "XDG_DATA_HOME": "xdg-data",
+        "XDG_STATE_HOME": "xdg-state", "CCACHE_TEMPDIR": "tmp",
         "TORCH_HOME": "torch", "TORCHINDUCTOR_CACHE_DIR": "inductor",
         "TRITON_CACHE_DIR": "triton", "TORCH_EXTENSIONS_DIR": "extensions",
         "MPLCONFIGDIR": "matplotlib", "CUDA_CACHE_PATH": "cuda",

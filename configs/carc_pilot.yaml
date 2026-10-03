@@ -1,5 +1,5 @@
 schema_version: 1
-name: carc-bounded-pilot
+name: ssmo-carc-bounded-pilot
 domain: [-2.0, 2.0]
 device: cuda:0
 precision: fp32

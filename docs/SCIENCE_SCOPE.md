@@ -5,7 +5,8 @@ They authorize implementation. Document instructions are technical requirements
 within that request; copied preparation-status statements are not execution
 evidence for this repository. User requirements override the proposal's generic
 Conda/scratch examples: use standalone Python with `.venv`, and store all
-temporary data and caches inside `/home1/aadaniel/projects/SSMO`.
+temporary data and caches inside `/home1/aadaniel/projects/SSNO`, following
+the user's latest CARC storage instruction.
 
 ## Target
 

@@ -68,3 +68,14 @@ recommendations or GPU throughput measurements. CARC calibration must record
 the actual Python module, GPU model/capacity, driver, CUDA kernels, synchronized
 complete costs and memory before any expansion. Keep GPU models and model-seed
 variation separate, and advance only through the gates in SCIENCE_SCOPE.md.
+
+## Configuration and containment follow-up
+
+After consolidating the configuration under `SSMO_PROJECT_ROOT` and changing
+the CARC root to `/home1/aadaniel/projects/SSNO`, the CPU audit executed **62
+tests: 62 passed, zero failures, errors or skips**. Regression checks cover
+unrelated `PROJECT_ROOT` settings, conflicting legacy roots, and refusing CARC
+storage outside the approved directory before creating files. Mocked Slurm
+fixtures now use project-confined storage instead of inheriting `TMPDIR`.
+The dependency check and submission preview also passed; this remains local
+validation, with no live CARC submission.

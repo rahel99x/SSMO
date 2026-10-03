@@ -6,28 +6,39 @@
 ssmo_error() { printf 'SSMO: %s\n' "$*" >&2; }
 
 ssmo_init_root() {
-    SSMO_ROOT=${SSMO_ROOT:-/home1/aadaniel/projects/SSMO}
-    [[ "$SSMO_ROOT" = /* && "$SSMO_ROOT" != / ]] || { ssmo_error 'project root must be absolute'; return 1; }
-    [[ -d "$SSMO_ROOT" ]] || { ssmo_error "project root does not exist: $SSMO_ROOT"; return 1; }
+    # SSMO_ROOT is a legacy project-specific alias; never read PROJECT_ROOT.
+    if [[ -n ${SSMO_PROJECT_ROOT:-} && -n ${SSMO_ROOT:-} && "$SSMO_PROJECT_ROOT" != "$SSMO_ROOT" ]]; then
+        ssmo_error 'SSMO_PROJECT_ROOT and legacy SSMO_ROOT disagree'
+        return 1
+    fi
+    SSMO_PROJECT_ROOT=${SSMO_PROJECT_ROOT:-${SSMO_ROOT:-/home1/aadaniel/projects/SSNO}}
+    # Check before creating any caches: CARC writes have one approved root.
+    if [[ $(id -un) = aadaniel || -n ${SLURM_JOB_ID:-} ]]; then
+        [[ "$SSMO_PROJECT_ROOT" = /home1/aadaniel/projects/SSNO ]] || {
+            ssmo_error 'CARC storage requires /home1/aadaniel/projects/SSNO'
+            return 1
+        }
+    fi
+    [[ "$SSMO_PROJECT_ROOT" = /* && "$SSMO_PROJECT_ROOT" != / ]] || { ssmo_error 'project root must be absolute'; return 1; }
+    [[ -d "$SSMO_PROJECT_ROOT" ]] || { ssmo_error "project root does not exist: $SSMO_PROJECT_ROOT"; return 1; }
     local canonical
-    canonical=$(realpath -e -- "$SSMO_ROOT") || return 1
-    [[ "$canonical" = "$SSMO_ROOT" ]] || { ssmo_error 'project root must be canonical and cannot be a symlink'; return 1; }
-    export SSMO_ROOT
-    export SSMO_PROJECT_ROOT="$SSMO_ROOT"
+    canonical=$(realpath -e -- "$SSMO_PROJECT_ROOT") || return 1
+    [[ "$canonical" = "$SSMO_PROJECT_ROOT" ]] || { ssmo_error 'project root must be canonical and cannot be a symlink'; return 1; }
+    export SSMO_PROJECT_ROOT
 }
 
 # Resolve relative paths inside the project and reject every escaping component.
 # This uses coreutils, so it works before Python/venv/cache setup.
 ssmo_path() {
     local candidate=${1:?path required} canonical component resolved
-    [[ "$candidate" = /* ]] || candidate="$SSMO_ROOT/$candidate"
+    [[ "$candidate" = /* ]] || candidate="$SSMO_PROJECT_ROOT/$candidate"
     canonical=$(realpath -m -- "$candidate") || return 1
-    [[ "$canonical" = "$SSMO_ROOT" || "$canonical" = "$SSMO_ROOT/"* ]] || { ssmo_error "path escapes project: $candidate"; return 1; }
+    [[ "$canonical" = "$SSMO_PROJECT_ROOT" || "$canonical" = "$SSMO_PROJECT_ROOT/"* ]] || { ssmo_error "path escapes project: $candidate"; return 1; }
     component="$candidate"
     while [[ "$component" != / && "$component" != . ]]; do
         if [[ -L "$component" ]]; then
             resolved=$(realpath -m -- "$component") || return 1
-            [[ "$resolved" = "$SSMO_ROOT" || "$resolved" = "$SSMO_ROOT/"* ]] || { ssmo_error "symlink escapes project: $component"; return 1; }
+            [[ "$resolved" = "$SSMO_PROJECT_ROOT" || "$resolved" = "$SSMO_PROJECT_ROOT/"* ]] || { ssmo_error "symlink escapes project: $component"; return 1; }
         fi
         component=$(dirname -- "$component") || return 1
     done
@@ -60,26 +71,26 @@ ssmo_env() {
     [[ "$threads" =~ ^[1-9][0-9]*$ ]] || { ssmo_error 'invalid allocation thread count'; return 1; }
     # The Python runtime also uses .cache; reject preexisting escaping links
     # before starting the interpreter, even though it validates paths itself.
-    ssmo_check_tree "$SSMO_ROOT/.cache" || return 1
+    ssmo_check_tree "$SSMO_PROJECT_ROOT/.cache" || return 1
     for location in local/tmp local/cache/pip local/cache/xdg local/cache/torch local/cache/triton local/cache/inductor local/cache/extensions local/cache/matplotlib local/cache/cuda local/cache/compiler local/cache/bytecode local/cache/numba; do
         ssmo_mkdir "$location" || return 1
     done
-    export TMPDIR="$SSMO_ROOT/local/tmp" TMP="$SSMO_ROOT/local/tmp" TEMP="$SSMO_ROOT/local/tmp"
-    export PIP_CACHE_DIR="$SSMO_ROOT/local/cache/pip" XDG_CACHE_HOME="$SSMO_ROOT/local/cache/xdg"
-    export XDG_CONFIG_HOME="$SSMO_ROOT/local/config" XDG_DATA_HOME="$SSMO_ROOT/local/data" XDG_STATE_HOME="$SSMO_ROOT/local/state"
+    export TMPDIR="$SSMO_PROJECT_ROOT/local/tmp" TMP="$SSMO_PROJECT_ROOT/local/tmp" TEMP="$SSMO_PROJECT_ROOT/local/tmp"
+    export PIP_CACHE_DIR="$SSMO_PROJECT_ROOT/local/cache/pip" XDG_CACHE_HOME="$SSMO_PROJECT_ROOT/local/cache/xdg"
+    export XDG_CONFIG_HOME="$SSMO_PROJECT_ROOT/local/config" XDG_DATA_HOME="$SSMO_PROJECT_ROOT/local/data" XDG_STATE_HOME="$SSMO_PROJECT_ROOT/local/state"
     for location in "$XDG_CONFIG_HOME" "$XDG_DATA_HOME" "$XDG_STATE_HOME"; do ssmo_mkdir "$location" || return 1; done
-    export TORCH_HOME="$SSMO_ROOT/local/cache/torch" TRITON_CACHE_DIR="$SSMO_ROOT/local/cache/triton"
-    export TORCHINDUCTOR_CACHE_DIR="$SSMO_ROOT/local/cache/inductor"
-    export TORCH_EXTENSIONS_DIR="$SSMO_ROOT/local/cache/extensions" MPLCONFIGDIR="$SSMO_ROOT/local/cache/matplotlib"
-    export CUDA_CACHE_PATH="$SSMO_ROOT/local/cache/cuda" CCACHE_DIR="$SSMO_ROOT/local/cache/compiler"
-    export CCACHE_TEMPDIR="$SSMO_ROOT/local/tmp" CMAKE_BUILD_PARALLEL_LEVEL="$threads" MAX_JOBS="$threads"
-    export PYTHONPYCACHEPREFIX="$SSMO_ROOT/local/cache/bytecode" NUMBA_CACHE_DIR="$SSMO_ROOT/local/cache/numba"
-    export PYTHONNOUSERSITE=1 PYTHONUSERBASE="$SSMO_ROOT/local/python-user"
+    export TORCH_HOME="$SSMO_PROJECT_ROOT/local/cache/torch" TRITON_CACHE_DIR="$SSMO_PROJECT_ROOT/local/cache/triton"
+    export TORCHINDUCTOR_CACHE_DIR="$SSMO_PROJECT_ROOT/local/cache/inductor"
+    export TORCH_EXTENSIONS_DIR="$SSMO_PROJECT_ROOT/local/cache/extensions" MPLCONFIGDIR="$SSMO_PROJECT_ROOT/local/cache/matplotlib"
+    export CUDA_CACHE_PATH="$SSMO_PROJECT_ROOT/local/cache/cuda" CCACHE_DIR="$SSMO_PROJECT_ROOT/local/cache/compiler"
+    export CCACHE_TEMPDIR="$SSMO_PROJECT_ROOT/local/tmp" CMAKE_BUILD_PARALLEL_LEVEL="$threads" MAX_JOBS="$threads"
+    export PYTHONPYCACHEPREFIX="$SSMO_PROJECT_ROOT/local/cache/bytecode" NUMBA_CACHE_DIR="$SSMO_PROJECT_ROOT/local/cache/numba"
+    export PYTHONNOUSERSITE=1 PYTHONUSERBASE="$SSMO_PROJECT_ROOT/local/python-user"
     export OMP_NUM_THREADS="$threads" OPENBLAS_NUM_THREADS="$threads" MKL_NUM_THREADS="$threads"
     export NUMEXPR_NUM_THREADS="$threads" VECLIB_MAXIMUM_THREADS="$threads" BLIS_NUM_THREADS="$threads"
     export PIP_DISABLE_PIP_VERSION_CHECK=1 PIP_REQUIRE_VIRTUALENV=1
     export CUBLAS_WORKSPACE_CONFIG=:4096:8
-    export SSMO_PYTHON="$SSMO_ROOT/.venv/bin/python"
+    export SSMO_PYTHON="$SSMO_PROJECT_ROOT/.venv/bin/python"
 }
 
 ssmo_load_python() {
@@ -93,6 +104,6 @@ ssmo_load_python() {
 ssmo_check_venv() {
     local canonical
     canonical=$(ssmo_path .venv/bin/python) || return 1
-    [[ -x "$canonical" && -f "$SSMO_ROOT/.venv/pyvenv.cfg" ]] || { ssmo_error 'project venv missing; run install stage'; return 1; }
-    ssmo_check_tree "$SSMO_ROOT/.venv" || return 1
+    [[ -x "$canonical" && -f "$SSMO_PROJECT_ROOT/.venv/pyvenv.cfg" ]] || { ssmo_error 'project venv missing; run install stage'; return 1; }
+    ssmo_check_tree "$SSMO_PROJECT_ROOT/.venv" || return 1
 }

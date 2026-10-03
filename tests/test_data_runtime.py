@@ -1,14 +1,53 @@
 import json
+import os
 from pathlib import Path
 import tempfile
 import unittest
+from unittest.mock import patch
 
 from singular_sensitivity.data import generate_manifest, inference_input, validate_manifest
 from singular_sensitivity.config import load_config
-from singular_sensitivity.runtime import confined_path, project_root
+from singular_sensitivity.runtime import confined_path, initialize_storage, project_root
 
 
 class DataRuntimeTests(unittest.TestCase):
+    def test_generic_project_root_does_not_redirect_ssmo(self):
+        with tempfile.TemporaryDirectory(dir=project_root() / ".cache/tmp") as other_project:
+            with patch.dict(os.environ, {"PROJECT_ROOT": other_project,
+                                         "SSMO_PROJECT_ROOT": "", "SSMO_ROOT": ""}):
+                expected = Path(__file__).resolve().parents[1]
+                self.assertEqual(project_root(), expected)
+                self.assertEqual(confined_path("runs/namespace-check.json"),
+                                 expected / "runs/namespace-check.json")
+
+    def test_namespaced_roots_and_legacy_alias_select_same_storage(self):
+        with tempfile.TemporaryDirectory(dir=project_root() / ".cache/tmp") as ssmo_directory:
+            cases = [(ssmo_directory, ""), ("", ssmo_directory),
+                     (ssmo_directory, ssmo_directory)]
+            for configured, legacy in cases:
+                with self.subTest(configured=configured, legacy=legacy):
+                    with patch.dict(os.environ, {"SSMO_PROJECT_ROOT": configured,
+                                                 "SSMO_ROOT": legacy, "PROJECT_ROOT": "/"}):
+                        self.assertEqual(project_root(), Path(ssmo_directory))
+                        self.assertEqual(confined_path("runs/namespace-check.json"),
+                                         Path(ssmo_directory) / "runs/namespace-check.json")
+
+    def test_conflicting_ssmo_root_settings_stop_artifact_resolution(self):
+        with patch.dict(os.environ, {"SSMO_PROJECT_ROOT": str(project_root()),
+                                     "SSMO_ROOT": "/another-project"}):
+            with self.assertRaisesRegex(ValueError, "disagree"):
+                confined_path("runs/namespace-check.json")
+
+    def test_carc_storage_rejects_other_directory_before_creating_files(self):
+        with tempfile.TemporaryDirectory(dir=project_root() / ".cache/tmp") as directory:
+            approved = Path(directory) / "approved"
+            unrelated = Path(directory) / "unrelated"
+            with patch("singular_sensitivity.runtime.CARC_PROJECT_ROOT", approved):
+                with patch.dict(os.environ, {"SLURM_JOB_ID": "mock-allocation"}):
+                    with self.assertRaisesRegex(ValueError, "CARC storage"):
+                        initialize_storage(unrelated)
+            self.assertFalse(unrelated.exists())
+
     def test_compact_reproducible_disjoint_parents(self):
         config = load_config(project_root() / "configs/smoke.yaml")
         manifest = generate_manifest(config)

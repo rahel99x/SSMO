@@ -39,34 +39,39 @@ Python 3.11 or 3.12 and a project-local `.venv` are required. Use
 and temporary files to this project and refuses heavy installation on a CARC
 login node. No Conda environment is used.
 
+Use `SSMO_PROJECT_ROOT` for this checkout and `SSMO_RUN_DIR` for a study's
+artifacts. The generic `PROJECT_ROOT` variable is ignored. The earlier
+`SSMO_ROOT` name remains a compatibility alias; if both SSMO root variables
+are set, they must agree. Library-required cache and temporary variable names
+remain standard, with their paths confined to the SSMO directory.
+
 ```bash
 cd /absolute/path/to/SSMO
 bash scripts/setup_local.sh
-export SSMO_ROOT="$PWD"
+export SSMO_PROJECT_ROOT="$PWD"
 source scripts/carc_env.sh
 ssmo_env
-export SSMO_PROJECT_ROOT="$SSMO_ROOT"
 
 # Select a fresh, project-local directory for each study.
-RUN="$SSMO_ROOT/runs/local-smoke-001"
-mkdir -p "$RUN"
-"$SSMO_ROOT/.venv/bin/python" -m singular_sensitivity.cli plan --config configs/smoke.yaml
-"$SSMO_ROOT/.venv/bin/python" -m singular_sensitivity.cli audit --config configs/smoke.yaml --run-dir "$RUN/audit"
-"$SSMO_ROOT/.venv/bin/python" -m singular_sensitivity.cli generate --config configs/smoke.yaml --run-dir "$RUN/data"
-"$SSMO_ROOT/.venv/bin/python" -m singular_sensitivity.cli representation --config configs/smoke.yaml --run-dir "$RUN/representation"
-"$SSMO_ROOT/.venv/bin/python" -m singular_sensitivity.cli numerical --config configs/smoke.yaml --run-dir "$RUN/numerical"
-"$SSMO_ROOT/.venv/bin/python" -m singular_sensitivity.cli train --config configs/smoke.yaml --run-dir "$RUN/measure" --manifest "$RUN/data/parents.json" --method measure --seed 17
-"$SSMO_ROOT/.venv/bin/python" -m singular_sensitivity.cli train --config configs/smoke.yaml --run-dir "$RUN/state-only" --manifest "$RUN/data/parents.json" --method state_only --seed 17
-"$SSMO_ROOT/.venv/bin/python" -m singular_sensitivity.cli evaluate --config configs/smoke.yaml --run-dir "$RUN/evaluate-measure" --manifest "$RUN/data/parents.json" --checkpoint "$RUN/measure/best.pt"
-"$SSMO_ROOT/.venv/bin/python" -m singular_sensitivity.cli evaluate --config configs/smoke.yaml --run-dir "$RUN/evaluate-state-only" --manifest "$RUN/data/parents.json" --checkpoint "$RUN/state-only/best.pt"
-"$SSMO_ROOT/.venv/bin/python" -m singular_sensitivity.cli inverse --config configs/smoke.yaml --run-dir "$RUN/inverse" --checkpoint "$RUN/measure/best.pt"
-"$SSMO_ROOT/.venv/bin/python" -m singular_sensitivity.cli report --config configs/smoke.yaml --run-dir "$RUN"
+SSMO_RUN_DIR="$SSMO_PROJECT_ROOT/runs/local-smoke-001"
+mkdir -p "$SSMO_RUN_DIR"
+"$SSMO_PROJECT_ROOT/.venv/bin/python" -m singular_sensitivity.cli plan --config configs/smoke.yaml
+"$SSMO_PROJECT_ROOT/.venv/bin/python" -m singular_sensitivity.cli audit --config configs/smoke.yaml --run-dir "$SSMO_RUN_DIR/audit"
+"$SSMO_PROJECT_ROOT/.venv/bin/python" -m singular_sensitivity.cli generate --config configs/smoke.yaml --run-dir "$SSMO_RUN_DIR/data"
+"$SSMO_PROJECT_ROOT/.venv/bin/python" -m singular_sensitivity.cli representation --config configs/smoke.yaml --run-dir "$SSMO_RUN_DIR/representation"
+"$SSMO_PROJECT_ROOT/.venv/bin/python" -m singular_sensitivity.cli numerical --config configs/smoke.yaml --run-dir "$SSMO_RUN_DIR/numerical"
+"$SSMO_PROJECT_ROOT/.venv/bin/python" -m singular_sensitivity.cli train --config configs/smoke.yaml --run-dir "$SSMO_RUN_DIR/measure" --manifest "$SSMO_RUN_DIR/data/parents.json" --method measure --seed 17
+"$SSMO_PROJECT_ROOT/.venv/bin/python" -m singular_sensitivity.cli train --config configs/smoke.yaml --run-dir "$SSMO_RUN_DIR/state-only" --manifest "$SSMO_RUN_DIR/data/parents.json" --method state_only --seed 17
+"$SSMO_PROJECT_ROOT/.venv/bin/python" -m singular_sensitivity.cli evaluate --config configs/smoke.yaml --run-dir "$SSMO_RUN_DIR/evaluate-measure" --manifest "$SSMO_RUN_DIR/data/parents.json" --checkpoint "$SSMO_RUN_DIR/measure/best.pt"
+"$SSMO_PROJECT_ROOT/.venv/bin/python" -m singular_sensitivity.cli evaluate --config configs/smoke.yaml --run-dir "$SSMO_RUN_DIR/evaluate-state-only" --manifest "$SSMO_RUN_DIR/data/parents.json" --checkpoint "$SSMO_RUN_DIR/state-only/best.pt"
+"$SSMO_PROJECT_ROOT/.venv/bin/python" -m singular_sensitivity.cli inverse --config configs/smoke.yaml --run-dir "$SSMO_RUN_DIR/inverse" --checkpoint "$SSMO_RUN_DIR/measure/best.pt"
+"$SSMO_PROJECT_ROOT/.venv/bin/python" -m singular_sensitivity.cli report --config configs/smoke.yaml --run-dir "$SSMO_RUN_DIR"
 ```
 
 For CARC use the [inline runbook](docs/CARC_RUNBOOK.md), which contains discovery,
 resource budgets, dry-run previews, explicit submissions and recovery commands.
 Every allocation charges `anakano_81`; project storage is
-`/home1/aadaniel/projects/SSMO`. CPU stages use `main`; GPU stages use `gpu`.
+`/home1/aadaniel/projects/SSNO`. CPU stages use `main`; GPU stages use `gpu`.
 A100 40 GB, A40, A30, L40 and L40S are separate profiles. Only currently observed
 GRES/feature labels may be submitted. Runtime audits execute CUDA kernels and
 mixed-derivative backward work in the allocated task and enforce the 80% measured

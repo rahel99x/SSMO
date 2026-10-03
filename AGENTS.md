@@ -7,7 +7,7 @@ gated future work as well as current requirements.
 
 Use standalone Python 3.11/3.12 and the project-local `.venv`, never Conda.
 `bash scripts/setup_local.sh` prepares the cloud/CPU environment. Source
-`scripts/carc_env.sh` only after setting `SSMO_ROOT` to the actual project root;
+`scripts/carc_env.sh` only after setting `SSMO_PROJECT_ROOT` to the actual project root;
 call `ssmo_env` before Python. Invoke `.venv/bin/python` explicitly. All artifact,
 temporary and cache paths must stay inside the project; preserve failed results.
 
@@ -16,7 +16,7 @@ or the CLI audit, with the venv interpreter and confined caches. Full tests run
 in seconds; tests with mocked Slurm do not establish CARC execution. Actual
 CARC tests, installation, generation, training and benchmarks require Slurm
 allocations and `srun`, explicit `--account=anakano_81`, and root
-`/home1/aadaniel/projects/SSMO`. Read docs/CARC_RUNBOOK.md before deployment.
+`/home1/aadaniel/projects/SSNO`. Read docs/CARC_RUNBOOK.md before deployment.
 Preparing scripts does not authorize live submissions. `submit.sh` is dry-run
 by default; preserve Slurm's `CUDA_VISIBLE_DEVICES` and use `cuda:0`.
 

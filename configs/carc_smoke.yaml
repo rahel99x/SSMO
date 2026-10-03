@@ -1,5 +1,5 @@
 schema_version: 1
-name: carc-single-gpu-smoke
+name: ssmo-carc-single-gpu-smoke
 domain: [-2.0, 2.0]
 device: cuda:0
 precision: fp32

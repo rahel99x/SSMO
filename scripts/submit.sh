@@ -118,7 +118,7 @@ resources() {
 }
 
 if (( submit )); then
-    [[ "$SSMO_ROOT" = /home1/aadaniel/projects/SSMO ]] || { ssmo_error 'live submissions require the exact CARC project root'; exit 2; }
+    [[ "$SSMO_PROJECT_ROOT" = /home1/aadaniel/projects/SSNO ]] || { ssmo_error 'live submissions require the exact CARC project root'; exit 2; }
     [[ $(id -un) = aadaniel ]] || { ssmo_error 'live submissions require CARC user aadaniel'; exit 2; }
     command -v sbatch >/dev/null || { ssmo_error 'sbatch unavailable'; exit 2; }
     [[ "$discovery" =~ ^[A-Za-z0-9][A-Za-z0-9_-]{0,79}$ ]] || { ssmo_error '--discovery ID is required for live submissions'; exit 2; }
@@ -173,12 +173,12 @@ if (( submit )); then
     # arbitrary cache/data/output directories from the development checkout.
     source_paths=()
     for path in singular_sensitivity scripts slurm requirements tests configs docs pyproject.toml README.md AGENTS.md LICENSE .gitignore requirements.txt; do
-        if [[ -e "$SSMO_ROOT/$path" ]]; then
+        if [[ -e "$SSMO_PROJECT_ROOT/$path" ]]; then
             ssmo_path "$path" >/dev/null
             source_paths+=("$path")
         fi
     done
-    tar -C "$SSMO_ROOT" --exclude='__pycache__' --exclude='*.pyc' --exclude='.pytest_cache' --exclude='.cache' --exclude='*.egg-info' --exclude='build' --exclude='dist' -cf "$run_dir/source.tar" "${source_paths[@]}"
+    tar -C "$SSMO_PROJECT_ROOT" --exclude='__pycache__' --exclude='*.pyc' --exclude='.pytest_cache' --exclude='.cache' --exclude='*.egg-info' --exclude='build' --exclude='dist' -cf "$run_dir/source.tar" "${source_paths[@]}"
     tar -C "$source_dir" -xf "$run_dir/source.tar"
     ssmo_check_tree "$source_dir"
     while IFS= read -r -d '' link; do
@@ -189,20 +189,20 @@ if (( submit )); then
     (cd "$source_dir"; find . -type f -print0 | sort -z | xargs -0 sha256sum) > "$run_dir/source-sha256.txt"
     (cd "$source_dir"; find . -type f -printf '%m %p\n' | sort) > "$run_dir/source-modes.txt"
     sha256sum "$run_dir/source.tar" "$frozen_config" > "$run_dir/run-sha256.txt"
-    if [[ -e "$SSMO_ROOT/.git" ]]; then
-        git -C "$SSMO_ROOT" rev-parse HEAD > "$run_dir/source-revision.txt" 2>/dev/null || printf 'unborn or unavailable\n' > "$run_dir/source-revision.txt"
+    if [[ -e "$SSMO_PROJECT_ROOT/.git" ]]; then
+        git -C "$SSMO_PROJECT_ROOT" rev-parse HEAD > "$run_dir/source-revision.txt" 2>/dev/null || printf 'unborn or unavailable\n' > "$run_dir/source-revision.txt"
     else
         printf 'Git metadata unavailable\n' > "$run_dir/source-revision.txt"
     fi
-    if [[ ! -e "$SSMO_ROOT/.git" ]] || ! git -C "$SSMO_ROOT" status --short > "$run_dir/source-status.txt" 2> "$run_dir/git-status-error.txt"; then
+    if [[ ! -e "$SSMO_PROJECT_ROOT/.git" ]] || ! git -C "$SSMO_PROJECT_ROOT" status --short > "$run_dir/source-status.txt" 2> "$run_dir/git-status-error.txt"; then
         printf 'Git metadata unavailable; use recorded source hashes and modes.\n' > "$run_dir/source-status.txt"
     fi
-    if [[ -f "$SSMO_ROOT/.venv/ssmo-dependency-freeze.txt" ]]; then
-        ssmo_path "$SSMO_ROOT/.venv/ssmo-dependency-freeze.txt" >/dev/null
-        cp -- "$SSMO_ROOT/.venv/ssmo-dependency-freeze.txt" "$run_dir/artifacts/dependency-freeze.txt"
+    if [[ -f "$SSMO_PROJECT_ROOT/.venv/ssmo-dependency-freeze.txt" ]]; then
+        ssmo_path "$SSMO_PROJECT_ROOT/.venv/ssmo-dependency-freeze.txt" >/dev/null
+        cp -- "$SSMO_PROJECT_ROOT/.venv/ssmo-dependency-freeze.txt" "$run_dir/artifacts/dependency-freeze.txt"
     fi
     cp -a "$discovery_dir" "$run_dir/discovery"
-    printf 'run_id=%s\nroot=%s\nconfig=%s\nprofile=%s\npython_module=%s\npipeline=%s\nmax_project_jobs=%s\naccount_slots=%s\nfree_cpus=%s\nfree_mem_gb=%s\nfree_gpus=%s\n' "$run_id" "$SSMO_ROOT" "$config" "$profile" "$python_module" "$pipeline" "$max_project_jobs" "$account_slots" "$free_cpus" "$free_mem" "$free_gpus" > "$run_dir/submission-manifest.txt"
+    printf 'run_id=%s\nssmo_project_root=%s\nconfig=%s\nprofile=%s\npython_module=%s\npipeline=%s\nmax_project_jobs=%s\naccount_slots=%s\nfree_cpus=%s\nfree_mem_gb=%s\nfree_gpus=%s\n' "$run_id" "$SSMO_PROJECT_ROOT" "$config" "$profile" "$python_module" "$pipeline" "$max_project_jobs" "$account_slots" "$free_cpus" "$free_mem" "$free_gpus" > "$run_dir/submission-manifest.txt"
     chmod -R a-w "$source_dir"
     chmod a-w "$frozen_config"
     printf 'stage\tmethod\tseed\tjob_id\tdependency\n' > "$run_dir/jobs.tsv"
@@ -214,7 +214,7 @@ for index in "${!stages[@]}"; do
     resources "$stage" || { ssmo_error 'GPU audit requires GPU profile'; exit 2; }
     this_checkpoint=$checkpoint
     [[ -n "$single_stage" ]] || this_checkpoint="$run_dir/artifacts/train-$this_method-seed$seed/best.pt"
-    cmd=(sbatch --parsable --account=anakano_81 "--partition=$partition" --ntasks=1 "--cpus-per-task=$cpus" "--mem=${memory}G" "--time=$wall" "--job-name=SSMO-$run_id-$stage-$this_method" "--output=$run_dir/logs/$stage-$this_method-%j.out" "--error=$run_dir/logs/$stage-$this_method-%j.err" "--chdir=$source_dir" "--export=ALL,SSMO_ROOT=$SSMO_ROOT,SSMO_PYTHON_MODULE=$python_module")
+    cmd=(sbatch --parsable --account=anakano_81 "--partition=$partition" --ntasks=1 "--cpus-per-task=$cpus" "--mem=${memory}G" "--time=$wall" "--job-name=SSMO-$run_id-$stage-$this_method" "--output=$run_dir/logs/$stage-$this_method-%j.out" "--error=$run_dir/logs/$stage-$this_method-%j.err" "--chdir=$source_dir" "--export=ALL,SSMO_PROJECT_ROOT=$SSMO_PROJECT_ROOT,SSMO_PYTHON_MODULE=$python_module")
     cmd+=("${gpu_args[@]}")
     [[ -z "$dependency" ]] || cmd+=("--dependency=afterok:$dependency")
     cmd+=("$source_dir/slurm/stage.sbatch" "$stage" "$run_dir" "$frozen_config" "$source_dir" "$profile" "$this_method" "$seed" "$manifest")

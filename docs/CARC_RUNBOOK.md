@@ -2,7 +2,7 @@
 
 This workflow prepares the scalar one-dimensional Burgers sensitivity experiment described in [PROPOSAL.md](PROPOSAL.md). Start with analytic references and a small end-to-end smoke run. The implementation and local CPU checks are preparation evidence; they do not establish CARC access, a submitted job, successful CUDA execution, a speedup, or a trained research result.
 
-The user-supplied [CARC_REQUIREMENTS.txt](CARC_REQUIREMENTS.txt) governs deployment. Use username `aadaniel`, explicitly charge **every allocation** to `anakano_81`, and keep the checkout, `.venv`, dependency downloads, temporary files, all caches, datasets, logs, reports and checkpoints under **`/home1/aadaniel/projects/SSMO`**. Use standalone Python and `python3 -m venv`; never Conda. These requirements override the proposal's generic scratch/Conda examples and its illustrative large training allocations.
+The user's latest instruction sets the CARC storage root to **`/home1/aadaniel/projects/SSNO`**, superseding the earlier directory in the supplied [CARC_REQUIREMENTS.txt](CARC_REQUIREMENTS.txt). Keep the checkout, `.venv`, dependency downloads, temporary files, all caches, datasets, logs, reports and checkpoints under that root; do not create or modify files elsewhere, including `/tmp` and `/scratch1`. The repository and environment prefix remain `SSMO`; `SSNO` is the approved CARC directory name. Use username `aadaniel`, explicitly charge **every allocation** to `anakano_81`, and use standalone Python and `python3 -m venv`, never Conda. These requirements override the proposal's generic scratch/Conda examples and its illustrative large training allocations.
 
 ## 1. What the stages establish
 
@@ -24,39 +24,36 @@ The initial learned experiment is deliberately scoped. The smoke trains the meas
 
 ## 2. Deploy the prepared checkout
 
-Copy or clone the prepared implementation into `/home1/aadaniel/projects/SSMO` using an authorized login session. Do not launch the workflow against an empty Git repository. Inspect existing files first and preserve other work. Each Codex cloud task is already isolated; use the existing checkout and do not create a Git worktree unless explicitly requested.
+Copy or clone the prepared implementation into `/home1/aadaniel/projects/SSNO` using an authorized login session. Do not launch the workflow against an empty Git repository. Inspect existing files first and preserve other work. Each Codex cloud task is already isolated; use the existing checkout and do not create a Git worktree unless explicitly requested.
 
-The cloud preparation also provides `runs/local-validation-001/SSMO-source.tar.gz`,
-a small source-only bundle with scripts, requirements, tests and documentation.
-Download it from the workspace. Set `CARC_LOGIN_HOST` to your actual authorized
-login hostname; this chat has not discovered or connected to it. From your local
-machine, transfer the archive to an existing reviewed project directory:
+With the existing `/home1/aadaniel/projects` parent directory and an absent or
+empty `SSNO` destination, clone the published implementation directly there:
 
 ```bash
-scp SSMO-source.tar.gz "aadaniel@${CARC_LOGIN_HOST}:/home1/aadaniel/projects/SSMO/SSMO-source.tar.gz"
+git clone --branch main https://github.com/rahel99x/SSMO.git /home1/aadaniel/projects/SSNO
 ```
 
-In the authorized CARC login session, extract into a reviewed source directory
-that has no conflicting files. Preserve any existing implementation for review;
-the following command refuses to overwrite it. If extraction reports a conflict,
-resolve that source deployment before running setup.
+For an existing clean clone at that path, use `git pull --ff-only` from inside
+it. Preserve earlier run directories and their frozen source/configuration.
 
-```bash
-cd /home1/aadaniel/projects/SSMO
-tar --no-same-owner --keep-old-files -xzf SSMO-source.tar.gz
-```
-
-The archive deliberately contains neither the cloud venv nor caches/results.
-The Slurm install stage creates the compatible CARC venv in the project.
+The Slurm install stage creates the compatible CARC venv in this project.
+Earlier validation archives preserve historical code and are not deployment
+sources for the current namespace and storage configuration.
 
 On the CARC login node, use only lightweight inspection, editing, discovery, submission and monitoring:
 
 ```bash
-cd /home1/aadaniel/projects/SSMO
-export SSMO_ROOT="/home1/aadaniel/projects/SSMO"
+cd /home1/aadaniel/projects/SSNO
+export SSMO_PROJECT_ROOT="/home1/aadaniel/projects/SSNO"
 source scripts/carc_env.sh
 ssmo_env
 ```
+
+All custom settings use the `SSMO_` prefix: `SSMO_PROJECT_ROOT`,
+`SSMO_DISCOVERY_ID` and `SSMO_RUN_ID`. Generic
+`PROJECT_ROOT` is ignored. Legacy `SSMO_ROOT` is accepted only when it agrees
+with `SSMO_PROJECT_ROOT` if both are set. Standard variables required by Python,
+libraries and Slurm retain their names and point into this project's storage.
 
 The helper sets project-local temporary/cache paths and preserves the caller's shell options. Do not source executable task or submission scripts: those use strict mode and are intended to run as separate Bash processes. Paths and symlinks must resolve inside the project root. The workflow must reject an output path, cache path or symlink escaping that root; do not substitute `/tmp`, `/scratch1` or a shared environment.
 
@@ -69,8 +66,8 @@ The allocated install stage uses `python3 -m venv --copies` so the venv interpre
 Choose a fresh run identifier for every new attempt. Use only letters, numbers, underscores and hyphens, and retain failed run directories for diagnosis.
 
 ```bash
-policy_id="ssmo-policy-001"
-bash scripts/discover_carc.sh --run-id "$policy_id"
+SSMO_DISCOVERY_ID="ssmo-policy-001"
+bash scripts/discover_carc.sh --run-id "$SSMO_DISCOVERY_ID"
 ```
 
 Discovery writes read-only observations under `runs/<policy-id>/discovery`. Use a separate fresh experiment ID: the submission wrapper rejects existing run directories, including discovery IDs. Check `status.tsv`, `manifest.txt` and the command output files for actual username, account associations/QoS limits, quota, `main` and `gpu` partitions, GPU GRES/features and standalone Python modules. A visible partition alone does not establish account authorization. Live submission requires every recorded discovery command to have succeeded, the record to be no more than one hour old and the account queue to match a fresh query. If the queue or policy changes, rediscover using a new policy ID and review capacity again.
@@ -110,15 +107,15 @@ Use the same task for hardware validation and the computation. Stop on an unexpe
 The wrapper defaults to a dry run. Read the printed allocation commands, absolute config/log/output paths and dependency chain before using explicit submission:
 
 ```bash
-run_id="ssmo-smoke-001"
-bash scripts/submit.sh --config configs/carc_smoke.yaml --run-id "$run_id" \
+SSMO_RUN_ID="ssmo-smoke-001"
+bash scripts/submit.sh --config configs/carc_smoke.yaml --run-id "$SSMO_RUN_ID" \
   --pipeline smoke --gpu-profile a10040 --seed 17
 
 # Example minima for this serial smoke ONLY if discovery review confirms
 # at least these free account capacities; otherwise do not use these values.
-bash scripts/submit.sh --config configs/carc_smoke.yaml --run-id "$run_id" \
+bash scripts/submit.sh --config configs/carc_smoke.yaml --run-id "$SSMO_RUN_ID" \
   --pipeline smoke --gpu-profile a10040 --seed 17 \
-  --discovery "$policy_id" --account-slots 7 --account-free-cpus 4 \
+  --discovery "$SSMO_DISCOVERY_ID" --account-slots 7 --account-free-cpus 4 \
   --account-free-mem-gb 8 --account-free-gpus 1 --submit
 ```
 
@@ -201,8 +198,8 @@ Resume under a new run ID and preview the resumed training command before explic
 ```bash
 bash scripts/submit.sh --config runs/ssmo-smoke-001/config.yaml --run-id ssmo-resume-001 \
   --stage train --gpu-profile a10040 --method measure --seed 17 \
-  --manifest /home1/aadaniel/projects/SSMO/runs/ssmo-smoke-001/artifacts/data/parents.json \
-  --resume /home1/aadaniel/projects/SSMO/runs/ssmo-smoke-001/artifacts/train-measure-seed17/last.pt
+  --manifest /home1/aadaniel/projects/SSNO/runs/ssmo-smoke-001/artifacts/data/parents.json \
+  --resume /home1/aadaniel/projects/SSNO/runs/ssmo-smoke-001/artifacts/train-measure-seed17/last.pt
 ```
 
 Replace the example paths with actual trusted artifacts. This is a preview; live resume needs the same discovery/capacity flags and `--submit`. Reuse the previous frozen configuration and verify the checkout's source still matches the checkpoint's recorded source assumptions before taking the new snapshot. Do not edit a prior snapshot. A changed implementation requires a separately validated migration rather than silently continuing the old run. Add `--after NEW_PREREQUISITE_ID` only when the resumed training actually needs a newly submitted prerequisite.

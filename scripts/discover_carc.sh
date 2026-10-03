@@ -36,6 +36,6 @@ capture gpu scontrol show partition gpu
 capture modules module avail python
 capture jobs squeue -h -u aadaniel -o '%i|%j|%T|%a|%C|%m|%b'
 capture account_jobs squeue -h -A anakano_81 -o '%i|%u|%j|%T|%C|%m|%b'
-printf 'run_id=%s\nroot=%s\nobserved_utc=%s\nfailed_commands=%s\n' "$run_id" "$SSMO_ROOT" "$(date -u +%FT%TZ)" "$errors" > "$run_dir/discovery/manifest.txt"
+printf 'run_id=%s\nssmo_project_root=%s\nobserved_utc=%s\nfailed_commands=%s\n' "$run_id" "$SSMO_PROJECT_ROOT" "$(date -u +%FT%TZ)" "$errors" > "$run_dir/discovery/manifest.txt"
 printf 'Discovery saved to %s\n' "$run_dir/discovery"
 (( errors == 0 ))

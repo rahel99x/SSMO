@@ -1,5 +1,5 @@
 schema_version: 1
-name: local-cpu-smoke
+name: ssmo-local-cpu-smoke
 domain: [-2.0, 2.0]
 device: cpu
 precision: fp32

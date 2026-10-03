@@ -11,15 +11,17 @@ import tempfile
 import time
 import unittest
 
+from singular_sensitivity.runtime import confined_path
+
 
 REPO = Path(__file__).resolve().parents[1]
-CARC_ROOT = "/home1/aadaniel/projects/SSMO"
+CARC_ROOT = "/home1/aadaniel/projects/SSNO"
 
 
 class SlurmWorkflowTests(unittest.TestCase):
     def setUp(self):
         # On CARC even test temporaries remain in the project, never /tmp.
-        base = Path(os.environ.get("TMPDIR", REPO / "local" / "test-tmp"))
+        base = confined_path("local/test-tmp")
         base.mkdir(parents=True, exist_ok=True)
         self.temp = tempfile.TemporaryDirectory(prefix="ssmo-slurm-", dir=base)
         self.root = Path(self.temp.name) / "project"
@@ -52,8 +54,9 @@ printf '\\n' >> "$MOCK_CALLS"
 if [[ ${MOCK_FAIL_STAGE:-} != '' && " $* " = *" ${MOCK_FAIL_STAGE} "* ]]; then exit 17; fi
 printf '%s;mockcluster\\n' "$n"
 """)
-        self.env = dict(os.environ, SSMO_ROOT=str(self.root), MOCK_CALLS=str(self.calls),
+        self.env = dict(os.environ, SSMO_PROJECT_ROOT=str(self.root), MOCK_CALLS=str(self.calls),
                         MOCK_COUNTER=str(self.counter), PATH=f"{self.bin}:{os.environ['PATH']}")
+        self.env.pop("SSMO_ROOT", None)
         self.discovery = self.root / "runs" / "observed" / "discovery"
         self.discovery.mkdir(parents=True)
         values = {
@@ -146,10 +149,41 @@ printf '%s;mockcluster\\n' "$n"
 
     def test_sourced_helper_preserves_options_and_returns(self):
         helper = shlex.quote(str(self.root / "scripts" / "carc_env.sh"))
-        script = f'pre=$(set +o); source {helper}; post=$(set +o); [[ "$pre" = "$post" ]] || exit 5; SSMO_ROOT=/nonexistent; ssmo_env; printf "shell-alive\\n"'
+        script = f'pre=$(set +o); source {helper}; post=$(set +o); [[ "$pre" = "$post" ]] || exit 5; SSMO_PROJECT_ROOT=/nonexistent; ssmo_env; printf "shell-alive\\n"'
         result = subprocess.run(["bash", "-c", script], env=self.env, text=True, capture_output=True)
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertIn("shell-alive", result.stdout)
+
+    def test_root_namespace_and_legacy_alias_are_consistent(self):
+        helper = shlex.quote(str(self.root / "scripts" / "carc_env.sh"))
+        script = f'source {helper}; ssmo_init_root || exit; printf "%s\\n" "$SSMO_PROJECT_ROOT"'
+        for use_legacy in (False, True):
+            with self.subTest(use_legacy=use_legacy):
+                env = dict(self.env, PROJECT_ROOT=str(self.bin))
+                if use_legacy:
+                    env["SSMO_ROOT"] = env.pop("SSMO_PROJECT_ROOT")
+                result = subprocess.run(["bash", "-c", script], env=env, text=True, capture_output=True)
+                self.assertEqual(result.returncode, 0, result.stderr)
+                self.assertEqual(result.stdout.strip(), str(self.root))
+
+    def test_conflicting_roots_stop_before_cache_creation(self):
+        helper = shlex.quote(str(self.root / "scripts" / "carc_env.sh"))
+        env = dict(self.env, SSMO_ROOT=str(self.bin))
+        result = subprocess.run(["bash", "-c", f"source {helper}; ssmo_env"],
+                                env=env, text=True, capture_output=True)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("disagree", result.stderr)
+        self.assertFalse((self.root / "local").exists())
+        self.assertFalse((self.bin / "local").exists())
+
+    def test_carc_root_guard_rejects_other_directory_before_cache_creation(self):
+        helper = shlex.quote(str(self.root / "scripts" / "carc_env.sh"))
+        env = dict(self.env, SSMO_PROJECT_ROOT=str(self.bin))
+        result = subprocess.run(["bash", "-c", f"source {helper}; ssmo_env"],
+                                env=env, text=True, capture_output=True)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("CARC storage requires", result.stderr)
+        self.assertFalse((self.bin / "local").exists())
 
     def test_account_queue_changes_and_caps_block_before_submit(self):
         self.env["MOCK_QUEUE"] = "9|other|other-project|RUNNING|4|8G|gpu:a100:1"
