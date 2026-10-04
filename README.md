@@ -100,6 +100,12 @@ cost records. It uses only the standard library and the project venv, writes a
 fresh review inside SSMO and keeps each initialization seed separate. See the
 [runbook](docs/CARC_RUNBOOK.md) for custom run IDs and review criteria.
 
+The [reported three-seed assessment](docs/CARC_REPLICATION_ASSESSMENT.md) finds
+measure training passes more weak-query parents than state-only in every seed,
+but every seed fails the
+fixed shock audit and the classical control passes all supported parents.
+The next step is CPU inspection of saved failures with the preset frozen.
+
 Every allocation charges `anakano_81`; project storage is
 `/home1/aadaniel/projects/SSMO`. CPU stages use `main`; GPU stages use `gpu`.
 A100 40 GB, A40, A30, L40 and L40S are separate profiles. Only currently observed

@@ -261,6 +261,15 @@ Keep the preset and tolerance frozen; a changed scientific protocol requires
 validation and a fresh final holdout. Prepare exact-reference multiple-front
 tests before progressing to learned collision logic or larger PDE regimes.
 
+The user's completed frozen review reports measure passes of 61/62, 55/62 and
+61/62 at seeds 17, 29 and 43; all three fail the fixed shock audit at tolerance
+0.01. Classical front regression passes 62/62 in each seed. The review is saved
+under `runs/ssmo-pilot-review-20261004T000302Z-2641811/`. Preserve it and the three
+source runs; these replications are complete and need no rerun. Follow the CPU
+failure-attribution plan in
+[CARC_REPLICATION_ASSESSMENT.md](CARC_REPLICATION_ASSESSMENT.md) before further
+learned experiments. The assessment does not change any submission settings.
+
 ## 6. Inspect the important outputs
 
 `status` reads actual IDs from `runs/<run-id>/jobs.tsv`, calls `squeue` and `sacct`,

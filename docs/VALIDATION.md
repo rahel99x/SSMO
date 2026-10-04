@@ -229,3 +229,24 @@ refusal, checkpoint selection, source preservation, symlink containment,
 standard-library-only execution and the Bash wrapper in a simulated Slurm
 allocation. These checks use synthetic artifact fixtures; the user's actual
 seed-29/43 accuracy and cost results await the generated CARC review.
+
+## User-reported completed frozen replications
+
+The subsequent user-supplied terminal output confirms that
+`bash scripts/summarize_pilots.sh` completed for seeds 17, 29 and 43 and saved
+`runs/ssmo-pilot-review-20261004T000302Z-2641811/` on CARC. It reports the common
+NVIDIA A100-PCIE-40GB profile and passed CUDA kernel audits. Measure passes are
+61/62, 55/62 and 61/62; state-only passes are 32/62, 41/62 and 32/62; classical
+passes are 62/62 in each seed. The same physical parents are not pooled across
+initializations. Every measure seed fails the fixed shock audit at the unchanged
+0.01 tolerance; seed 29 also fails six OOD parents.
+
+The extract supplies nonlinear-gradient, support/weight and direction-consistency
+diagnostics, identifies the retained unresolved collision record, and records
+40.380–44.372 seconds of measure training per seed. It does not include complete
+seed-29/43 Slurm allocation or inference cost records. See
+[CARC_REPLICATION_ASSESSMENT.md](CARC_REPLICATION_ASSESSMENT.md) for the complete
+reported assessment, evidence checksum and conservative CPU progression plan.
+These are remote observations supplied by the user, not independent cloud
+access to the raw CARC artifacts. This documentation revision changes no code,
+configuration, tolerance or job limits; the prior 125-test result is retained.

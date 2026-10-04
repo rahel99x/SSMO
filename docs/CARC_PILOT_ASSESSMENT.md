@@ -1,5 +1,9 @@
 # CARC seed-17 pilot assessment
 
+This is the historical single-seed assessment. The completed frozen seeds
+17, 29 and 43 are reviewed in
+[CARC_REPLICATION_ASSESSMENT.md](CARC_REPLICATION_ASSESSMENT.md).
+
 This assessment records the user's supplied Slurm accounting rows and extracted
 training/evaluation summaries for `ssmo-pilot-001`. It is reported CARC evidence,
 not a run executed or independently inspected from the cloud workspace. The
