@@ -34,6 +34,14 @@ descriptors. Keep the lockfile inode and distinguish contention from lock errors
 Use `scripts/summarize_pilots.sh` to review completed pilot replications. It reads
 existing artifacts with the venv and standard library; never pool repeated
 physical parents across initialization seeds or choose the best seed afterward.
+The user requests next runbook steps in every response: include runnable CARC
+commands, the expected result and the next evidence to inspect. Use completed
+artifacts when available rather than asking for a repeat of finished jobs.
+Use `scripts/diagnose_pilot_failures.sh --review-dir runs/<review-id>` for CPU
+inspection of frozen failed-parent query records. It validates receipts and
+reconstructs signed linear/nonlinear errors without loading model checkpoints.
+Its fixed-order terms may cancel; they are exploratory bookkeeping, not causal
+proof or permission to tune on the exposed audit/test cases.
 
 Retain signed atoms at continuous coordinates; never multiply an atom by cell
 width or normalize signed masses as probabilities. Nonlinear field objectives

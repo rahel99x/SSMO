@@ -270,6 +270,54 @@ failure-attribution plan in
 [CARC_REPLICATION_ASSESSMENT.md](CARC_REPLICATION_ASSESSMENT.md) before further
 learned experiments. The assessment does not change any submission settings.
 
+### Inspect frozen failed parents on CPU
+
+The failed-parent lists identify `audit-000000` in every seed and six additional
+OOD parents in seed 29. Inspect their already recorded query predictions with:
+
+```bash
+cd /home1/aadaniel/projects/SSMO
+git pull --ff-only
+export SSMO_PROJECT_ROOT="$PWD"
+unset SSMO_ROOT
+bash scripts/diagnose_pilot_failures.sh \
+  --review-dir runs/ssmo-pilot-review-20261004T000302Z-2641811
+```
+
+This is lightweight artifact inspection with Python 3.12.8 and the project
+venv. It imports no NumPy/Torch, loads no checkpoints, executes no model and
+submits no Slurm jobs. It streams the existing plain/gzip query records, verifies
+review and input receipts, and writes a fresh contained diagnostics directory.
+The source runs, selected checkpoints and declared 0.01 tolerance remain fixed.
+
+The diagnostic compares measure and state-only on the same measure-failure
+parents, retaining every recorded time/direction/query for those parents. The
+expected selection is one parent for seed 17, seven for seed 29 and one for
+seed 43, reported separately. The printed worst-row details include signed
+diffuse-coefficient, diffuse-boundary, atom-weight and atom-position terms.
+These terms telescope in a fixed order anchored at the reference support;
+they can cancel and are not a unique causal decomposition. Nonlinear errors
+are reconstructed separately using base traces and the payoff jump, with six
+signed terms retained in the JSON outputs.
+
+Each method's worst query may differ. Use `failures.jsonl` for comparisons at
+the same parent/time/direction/query. Other state-only failures, classical
+control rows and unseen parents are outside this targeted diagnostic. Zero
+directions are validated and retained but excluded from the original nonzero
+gate maximum.
+
+The numerical reconstruction check uses `1e-10 * max(1, abs(values))`; it checks
+agreement with the stored scalar calculations and does not change the physical
+weak-error tolerance. Missing/mismatched records, changed formulas, invalid or
+unresolved selected charts and corrupted gzip receipts are errors. Preserve a
+failed diagnostics directory if a later source-change check fails; use a fresh
+destination for any corrected rerun.
+
+Read `summary.txt` in the printed destination and retain its `summary.json`,
+`failures.jsonl` and `provenance.json`. Share the printed summary before choosing
+another learned experiment. This is exploratory inspection of exposed failures;
+changed settings still require independent validation and a fresh final holdout.
+
 ## 6. Inspect the important outputs
 
 `status` reads actual IDs from `runs/<run-id>/jobs.tsv`, calls `squeue` and `sacct`,

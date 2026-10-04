@@ -250,3 +250,37 @@ reported assessment, evidence checksum and conservative CPU progression plan.
 These are remote observations supplied by the user, not independent cloud
 access to the raw CARC artifacts. This documentation revision changes no code,
 configuration, tolerance or job limits; the prior 125-test result is retained.
+
+## Frozen failure-attribution command
+
+`bash scripts/diagnose_pilot_failures.sh --review-dir runs/<review-id>` reads
+existing raw query records for the reviewed measure-failure parents, with both
+measure/state-only methods on those same parents. It reconstructs recorded
+reference/predicted values, four signed weak-error terms and six nonlinear
+payoff-jump terms using Python's standard library. It imports no GPU/numerical
+libraries, loads no checkpoint and creates no Slurm jobs. Plain logs or verified
+gzip archives are streamed without decompression files; all selected directions,
+times and queries remain in a fresh contained ledger, including zero directions.
+Complete row coverage, original gate maxima, metadata/source/helper checksums,
+unchanged inputs and output containment are checked before publishing summaries.
+The fixed-order terms are exploratory bookkeeping and can cancel; they do not
+identify a unique cause or authorize fitting the exposed test/audit cases.
+
+The revision passed **140/140 CPU tests**, with zero failures, errors, skips or
+expected failures, from an unchanged read-only source snapshot under
+`runs/ssmo-failure-diagnostics-audit-20261004T003212Z-300372/`. The CLI exit code
+was zero. Six new tests compare scalar query/calculus results with the production
+references and predictions, including signed cancellation, tiny-jump mass
+suppression and the nonlinear payoff jump. Nine orchestration checks cover
+record/provenance mismatches, complete coverage, source preservation, gzip
+corruption, missing archives, containment, mid-process changes and standalone
+Python `-S` plus mocked allocated Bash execution.
+
+The first immutable-source audit is preserved separately under
+`runs/ssmo-failure-diagnostics-audit-20261004T002951Z-282357/`: 139 passes and one
+test-fixture permission error, with source hashes/modes unchanged. Its disposable
+copy inherited read-only permissions and could not inject a deliberate formula
+corruption. Only disposable fixture copies are now made owner-writable; the
+fresh complete audit above confirms the correction. No scientific model, preset,
+tolerance, source run or job limit was changed. Actual CARC attribution results
+await the user's execution of the command against the retained raw artifacts.

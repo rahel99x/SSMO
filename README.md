@@ -105,6 +105,10 @@ measure training passes more weak-query parents than state-only in every seed,
 but every seed fails the
 fixed shock audit and the classical control passes all supported parents.
 The next step is CPU inspection of saved failures with the preset frozen.
+Use `bash scripts/diagnose_pilot_failures.sh --review-dir runs/<review-id>` to
+reconstruct their signed diffuse/atom errors from existing records. It streams
+plain or verified gzip logs, compares both learned methods on those parents,
+and writes a fresh contained review without model execution or GPU jobs.
 
 Every allocation charges `anakano_81`; project storage is
 `/home1/aadaniel/projects/SSMO`. CPU stages use `main`; GPU stages use `gpu`.

@@ -52,6 +52,20 @@ Nonlinear-gradient errors are separate from the linear weak-query gate. The
 small linear errors do not establish inverse-task efficacy or an acceptable
 nonlinear-objective tolerance.
 
+The user's subsequent failure-list extraction identifies `audit-000000` as
+the only failed measure parent at seeds 17 and 43. Seed 29 also fails these OOD
+parents, with zero invalid chart rows in every listed failure:
+
+| Seed-29 parent | Worst absolute weak-query error |
+|---|---:|
+| `audit-000000` | 0.011571503628520472 |
+| `ood-000004` | 0.010294983430147314 |
+| `ood-000005` | 0.012928586769360484 |
+| `ood-000007` | 0.012089161157333939 |
+| `ood-000010` | 0.01101926340263823 |
+| `ood-000014` | 0.012911335448274525 |
+| `ood-000026` | 0.012052648899172264 |
+
 ## Diagnostics and costs
 
 The measure fixed-shock support errors are 0.053922701, 0.051620054 and
