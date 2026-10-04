@@ -188,7 +188,7 @@ if (( submit )); then
     # Include the known implementation source (tracked and untracked), never
     # arbitrary cache/data/output directories from the development checkout.
     source_paths=()
-    for path in singular_sensitivity scripts slurm requirements tests configs docs pyproject.toml README.md AGENTS.md LICENSE .gitignore requirements.txt; do
+    for path in singular_sensitivity scripts slurm requirements tests configs docs .tower/config.json .tower/contracts .tower/schemas .tower/definitions .tower/LICENSE.upstream .tower/UPSTREAM.json pyproject.toml README.md AGENTS.md LICENSE .gitignore requirements.txt; do
         if [[ -e "$SSMO_PROJECT_ROOT/$path" ]]; then
             ssmo_path "$path" >/dev/null
             source_paths+=("$path")
@@ -229,15 +229,26 @@ dependency=$after
 for index in "${!stages[@]}"; do
     stage=${stages[$index]}; this_method=${methods[$index]}
     resources "$stage" || { ssmo_error 'GPU audit requires GPU profile'; exit 2; }
+    # One writable reporting workdir per job, separate from the immutable
+    # multi-job source snapshot. Previewing these paths creates nothing.
+    printf -v attempt_number '%02d' "$(( index + 1 ))"
+    attempt_dir="$run_dir/tower/$attempt_number-$stage-$this_method-seed$seed"
+    scheduler_out="$run_dir/logs/$stage-$this_method-%j.out"
+    scheduler_err="$run_dir/logs/$stage-$this_method-%j.err"
+    gpu_count=0; gpu_type=
+    if [[ "$partition" = gpu ]]; then gpu_count=1; gpu_type=$gres; fi
     this_checkpoint=$checkpoint
     [[ -n "$single_stage" ]] || this_checkpoint="$run_dir/artifacts/train-$this_method-seed$seed/best.pt"
-    cmd=(sbatch --parsable --account=anakano_81 "--partition=$partition" --ntasks=1 "--cpus-per-task=$cpus" "--mem=${memory}G" "--time=$wall" "--job-name=SSMO-$run_id-$stage-$this_method" "--output=$run_dir/logs/$stage-$this_method-%j.out" "--error=$run_dir/logs/$stage-$this_method-%j.err" "--chdir=$source_dir" "--export=ALL,SSMO_PROJECT_ROOT=$SSMO_PROJECT_ROOT,SSMO_PYTHON_MODULE=$python_module")
+    cmd=(sbatch --parsable --account=anakano_81 "--partition=$partition" --nodes=1 --ntasks=1 "--cpus-per-task=$cpus" "--mem=${memory}G" "--time=$wall" "--job-name=SSMO-$run_id-$stage-$this_method" "--output=$scheduler_out" "--error=$scheduler_err" "--chdir=$attempt_dir" "--export=ALL,SSMO_PROJECT_ROOT=$SSMO_PROJECT_ROOT,SSMO_PYTHON_MODULE=$python_module,SSMO_TOWER_RUN_DIR=$attempt_dir,SSMO_TOWER_CPUS=$cpus,SSMO_TOWER_MEM_GB=$memory,SSMO_TOWER_WALLTIME=$wall,SSMO_TOWER_GPU_COUNT=$gpu_count,SSMO_TOWER_GPU_TYPE=$gpu_type,SSMO_TOWER_SCHEDULER_OUT=$scheduler_out,SSMO_TOWER_SCHEDULER_ERR=$scheduler_err")
     cmd+=("${gpu_args[@]}")
     [[ -z "$dependency" ]] || cmd+=("--dependency=afterok:$dependency")
     cmd+=("$source_dir/slurm/stage.sbatch" "$stage" "$run_dir" "$frozen_config" "$source_dir" "$profile" "$this_method" "$seed" "$manifest")
     if [[ "$stage" = train ]]; then cmd+=("$resume"); else cmd+=("$this_checkpoint"); fi
     cmd+=("$report_source")
     if (( submit )); then
+        ssmo_mkdir "$run_dir/tower"
+        [[ ! -e "$attempt_dir" && ! -L "$attempt_dir" ]] || { ssmo_error 'reporting attempt already exists; preserve it and use a fresh run'; exit 2; }
+        mkdir -- "$attempt_dir"
         printf '%q ' "${cmd[@]}" > "$run_dir/logs/submission-$stage-$this_method.command"
         printf '\n' >> "$run_dir/logs/submission-$stage-$this_method.command"
         job_output=$("${cmd[@]}" 2> "$run_dir/logs/submission-$stage-$this_method.err") || {

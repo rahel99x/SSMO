@@ -24,6 +24,7 @@ import torch
 
 from .models import ChartModel, chart_measure, chart_observables, linear_pairings
 from .runtime import confined_path
+from .tower_reporting import emit_event
 
 DIRECTION_CONVENTION = "physical-alpha=(u_left,u_right,initial_position); supplied-v; fixed-time; atom=(left-right)*Ds[v]"
 _CHECKPOINT_SCHEMA = 1
@@ -421,6 +422,7 @@ def train(config: dict, dataset: dict, run_dir: str | Path, device="cpu", resume
         for signum in (signal.SIGTERM, signal.SIGINT, signal.SIGUSR1):
             previous_handlers[signum] = signal.signal(signum, _signal_pause)
     status, stopped_reason = "complete", "step_budget"
+    tower_last_written = -math.inf
     last_terms = {}
     validation_values = history[-1]["validation"] if history else None
 
@@ -502,6 +504,23 @@ def train(config: dict, dataset: dict, run_dir: str | Path, device="cpu", resume
                     if entry["peak_reserved_bytes"] > 0.8 * hardware["gpu_total_bytes"]:
                         request_pause("gpu_memory_budget")
                 log.write(json.dumps(entry, sort_keys=True, allow_nan=False) + "\n")
+                # Keep every raw step in training.jsonl. Tower receives the
+                # current measured step at validation/checkpoint boundaries or
+                # about every two seconds, avoiding metadata I/O at every update.
+                if (os.environ.get("SSMO_TOWER_ACTIVE_COMMAND") == "train"
+                        and ("validation" in entry or step % checkpoint_every == 0
+                             or time.monotonic() - tower_last_written >= 2.0)):
+                    observations = {key: entry[key] for key in (
+                        "loss", "teacher_seconds", "forward_and_jvp_seconds", "backward_and_optimizer_seconds",
+                        "complete_step_seconds", "host_peak_rss_bytes", "peak_allocated_bytes", "peak_reserved_bytes")
+                        if key in entry}
+                    observations["training_cumulative_seconds"] = entry["elapsed_seconds"]
+                    observations.update({"loss_" + key: value for key, value in last_terms.items()})
+                    if "validation" in entry:
+                        observations.update({"validation_" + key: value for key, value in entry["validation"].items()
+                                             if isinstance(value, (int, float)) and not isinstance(value, bool)})
+                    emit_event("train", observations, step=step, completed=step, total=step_limit, unit="optimizer steps")
+                    tower_last_written = time.monotonic()
                 if step % checkpoint_every == 0:
                     _atomic_checkpoint(run_dir / "last.pt", snapshot())
                 if patience > 0 and stale_evaluations >= patience:

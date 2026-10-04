@@ -1,0 +1,1407 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Tower native planning bundle v1",
+  "description": "Explicit project-root report input for --planning-file and file-based predict/forecast/blockers/tradeoffs/scaling/workflow commands. Native consumers inspect only fields relevant to their selected view. This format does not auto-discover run directories.",
+  "type": "object",
+  "required": [
+    "version",
+    "kind"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "version": {
+      "type": "integer",
+      "const": 1
+    },
+    "kind": {
+      "const": "tower.planning"
+    },
+    "description": {
+      "type": "string",
+      "minLength": 0,
+      "maxLength": 4096,
+      "pattern": "^[^\\u0000-\\u001f\\u007f-\\u009f]*$"
+    },
+    "simulated": {
+      "type": "boolean"
+    },
+    "now": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 253402300799,
+      "description": "Unix epoch seconds in UTC. Omit or use null when unknown; never local time strings."
+    },
+    "coverage": {
+      "type": "number",
+      "exclusiveMinimum": 0,
+      "exclusiveMaximum": 1
+    },
+    "query": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "$ref": "summary.v1.schema.json#/properties/name"
+        },
+        "partition": {
+          "$ref": "summary.v1.schema.json#/properties/partition"
+        },
+        "account": {
+          "$ref": "summary.v1.schema.json#/properties/account"
+        },
+        "qos": {
+          "$ref": "summary.v1.schema.json#/properties/qos"
+        },
+        "cpus": {
+          "$ref": "summary.v1.schema.json#/properties/cpus"
+        },
+        "nodes": {
+          "$ref": "summary.v1.schema.json#/properties/nodes"
+        },
+        "gpus": {
+          "$ref": "summary.v1.schema.json#/properties/gpus"
+        },
+        "gpu_type": {
+          "$ref": "summary.v1.schema.json#/properties/gpu_type"
+        },
+        "mem_bytes": {
+          "$ref": "summary.v1.schema.json#/properties/mem_bytes"
+        },
+        "time_seconds": {
+          "$ref": "summary.v1.schema.json#/properties/time_seconds"
+        },
+        "script_sha256": {
+          "$ref": "summary.v1.schema.json#/properties/script_sha256"
+        },
+        "input_size": {
+          "$ref": "summary.v1.schema.json#/properties/input_size"
+        },
+        "parameters": {
+          "$ref": "summary.v1.schema.json#/properties/parameters"
+        },
+        "memory_scope": {
+          "$ref": "summary.v1.schema.json#/properties/memory_scope"
+        }
+      },
+      "description": "Exact workload/resource identity to analyze. Unknown query fields are omitted/null; that does not authorize pooling incompatible or ambiguous cohorts."
+    },
+    "history": {
+      "type": "array",
+      "maxItems": 10000,
+      "items": {
+        "$ref": "#/$defs/historyRecord"
+      }
+    },
+    "queue_history": {
+      "type": "array",
+      "maxItems": 10000,
+      "items": {
+        "$ref": "#/$defs/jobRecord"
+      },
+      "description": "Observed historical submissions/starts, not guessed waits. Native queue comparisons require concrete matching resources and sufficient independent outcomes."
+    },
+    "jobs": {
+      "type": "array",
+      "maxItems": 10000,
+      "items": {
+        "$ref": "#/$defs/jobRecord"
+      }
+    },
+    "job_id": {
+      "allOf": [
+        {
+          "$ref": "summary.v1.schema.json#/properties/job_id"
+        },
+        {
+          "not": {
+            "type": "null"
+          }
+        }
+      ]
+    },
+    "observations": {
+      "type": "array",
+      "maxItems": 10000,
+      "items": {
+        "$ref": "#/$defs/forecastObservation"
+      }
+    },
+    "candidates": {
+      "type": "array",
+      "maxItems": 64,
+      "items": {
+        "$ref": "#/$defs/candidate"
+      }
+    },
+    "scaling": {
+      "type": "array",
+      "maxItems": 10000,
+      "items": {
+        "$ref": "#/$defs/scalingRecord"
+      }
+    },
+    "records": {
+      "type": "array",
+      "maxItems": 10000,
+      "items": {
+        "$ref": "#/$defs/scalingRecord"
+      }
+    },
+    "mode": {
+      "enum": [
+        "strong",
+        "weak"
+      ]
+    },
+    "baseline": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 1000000
+    },
+    "workflow": {
+      "$ref": "#/$defs/workflowRecipe"
+    },
+    "details": {
+      "type": "object",
+      "description": "Optional exact frozen Slurm details by job ID. Match the current scheduler snapshot shape; omitted facts remain unknown."
+    },
+    "partitions": {
+      "type": "array",
+      "maxItems": 4096,
+      "items": {
+        "type": "object"
+      }
+    },
+    "nodes": {
+      "type": "object",
+      "description": "Frozen Tower nodemap shape for placement screening, not a replacement for scheduler allocation decisions."
+    },
+    "share": {
+      "type": "array",
+      "maxItems": 4096,
+      "items": {
+        "type": "object"
+      }
+    },
+    "health": {
+      "type": "object",
+      "description": "Optional source freshness/status metadata from the same snapshot."
+    }
+  },
+  "$defs": {
+    "historyRecord": {
+      "type": "object",
+      "if": {
+        "required": [
+          "schema"
+        ]
+      },
+      "then": {
+        "$ref": "summary.v1.schema.json"
+      },
+      "else": {
+        "type": "object",
+        "required": [
+          "name",
+          "state"
+        ],
+        "properties": {
+          "id": {
+            "$ref": "summary.v1.schema.json#/properties/id"
+          },
+          "name": {
+            "$ref": "summary.v1.schema.json#/properties/name"
+          },
+          "state": {
+            "$ref": "summary.v1.schema.json#/properties/state"
+          },
+          "partition": {
+            "$ref": "summary.v1.schema.json#/properties/partition"
+          },
+          "account": {
+            "$ref": "summary.v1.schema.json#/properties/account"
+          },
+          "qos": {
+            "$ref": "summary.v1.schema.json#/properties/qos"
+          },
+          "cpus": {
+            "$ref": "summary.v1.schema.json#/properties/cpus"
+          },
+          "nodes": {
+            "$ref": "summary.v1.schema.json#/properties/nodes"
+          },
+          "gpus": {
+            "$ref": "summary.v1.schema.json#/properties/gpus"
+          },
+          "gpu_type": {
+            "$ref": "summary.v1.schema.json#/properties/gpu_type"
+          },
+          "mem_bytes": {
+            "$ref": "summary.v1.schema.json#/properties/mem_bytes"
+          },
+          "time_seconds": {
+            "$ref": "summary.v1.schema.json#/properties/time_seconds"
+          },
+          "runtime_seconds": {
+            "$ref": "summary.v1.schema.json#/properties/runtime_seconds"
+          },
+          "memory_bytes": {
+            "$ref": "summary.v1.schema.json#/properties/memory_bytes"
+          },
+          "memory_scope": {
+            "$ref": "summary.v1.schema.json#/properties/memory_scope"
+          },
+          "cpu_seconds": {
+            "$ref": "summary.v1.schema.json#/properties/cpu_seconds"
+          },
+          "script_sha256": {
+            "$ref": "summary.v1.schema.json#/properties/script_sha256"
+          },
+          "parameters": {
+            "$ref": "summary.v1.schema.json#/properties/parameters"
+          },
+          "input_size": {
+            "$ref": "summary.v1.schema.json#/properties/input_size"
+          },
+          "start": {
+            "$ref": "summary.v1.schema.json#/properties/start"
+          },
+          "end": {
+            "$ref": "summary.v1.schema.json#/properties/end"
+          },
+          "submit": {
+            "$ref": "summary.v1.schema.json#/properties/submit"
+          },
+          "job_id": {
+            "$ref": "summary.v1.schema.json#/properties/job_id"
+          },
+          "experiment_id": {
+            "$ref": "summary.v1.schema.json#/properties/experiment_id"
+          },
+          "attempt": {
+            "$ref": "summary.v1.schema.json#/properties/attempt"
+          },
+          "project_id": {
+            "$ref": "summary.v1.schema.json#/properties/project_id"
+          },
+          "exit_code": {
+            "$ref": "summary.v1.schema.json#/properties/exit_code"
+          },
+          "workers": {
+            "$ref": "summary.v1.schema.json#/properties/workers"
+          },
+          "problem_size": {
+            "$ref": "summary.v1.schema.json#/properties/problem_size"
+          },
+          "repeat": {
+            "$ref": "summary.v1.schema.json#/properties/repeat"
+          },
+          "fingerprint": {
+            "$ref": "summary.v1.schema.json#/properties/fingerprint"
+          },
+          "work_units": {
+            "$ref": "summary.v1.schema.json#/properties/work_units"
+          },
+          "results": {
+            "$ref": "summary.v1.schema.json#/properties/results"
+          },
+          "metadata": {
+            "$ref": "summary.v1.schema.json#/properties/metadata"
+          },
+          "elapsed": {
+            "type": [
+              "string",
+              "number",
+              "null"
+            ]
+          },
+          "cpu_time": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "rss": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "max_rss": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "req_mem": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "mem_req": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "limit": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "exit": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "additionalProperties": true
+      },
+      "description": "Canonical summaries carry schema tower.summary/v1. Legacy native records without a schema marker remain accepted; native models independently check concrete identities and eligibility."
+    },
+    "jobRecord": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "$ref": "summary.v1.schema.json#/properties/id"
+        },
+        "name": {
+          "$ref": "summary.v1.schema.json#/properties/name"
+        },
+        "state": {
+          "$ref": "summary.v1.schema.json#/properties/state"
+        },
+        "partition": {
+          "$ref": "summary.v1.schema.json#/properties/partition"
+        },
+        "account": {
+          "$ref": "summary.v1.schema.json#/properties/account"
+        },
+        "qos": {
+          "$ref": "summary.v1.schema.json#/properties/qos"
+        },
+        "cpus": {
+          "$ref": "summary.v1.schema.json#/properties/cpus"
+        },
+        "nodes": {
+          "$ref": "summary.v1.schema.json#/properties/nodes"
+        },
+        "gpus": {
+          "$ref": "summary.v1.schema.json#/properties/gpus"
+        },
+        "gpu_type": {
+          "$ref": "summary.v1.schema.json#/properties/gpu_type"
+        },
+        "mem_bytes": {
+          "$ref": "summary.v1.schema.json#/properties/mem_bytes"
+        },
+        "time_seconds": {
+          "$ref": "summary.v1.schema.json#/properties/time_seconds"
+        },
+        "runtime_seconds": {
+          "$ref": "summary.v1.schema.json#/properties/runtime_seconds"
+        },
+        "memory_bytes": {
+          "$ref": "summary.v1.schema.json#/properties/memory_bytes"
+        },
+        "memory_scope": {
+          "$ref": "summary.v1.schema.json#/properties/memory_scope"
+        },
+        "cpu_seconds": {
+          "$ref": "summary.v1.schema.json#/properties/cpu_seconds"
+        },
+        "script_sha256": {
+          "$ref": "summary.v1.schema.json#/properties/script_sha256"
+        },
+        "parameters": {
+          "$ref": "summary.v1.schema.json#/properties/parameters"
+        },
+        "input_size": {
+          "$ref": "summary.v1.schema.json#/properties/input_size"
+        },
+        "start": {
+          "$ref": "summary.v1.schema.json#/properties/start"
+        },
+        "end": {
+          "$ref": "summary.v1.schema.json#/properties/end"
+        },
+        "submit": {
+          "$ref": "summary.v1.schema.json#/properties/submit"
+        },
+        "job_id": {
+          "$ref": "summary.v1.schema.json#/properties/job_id"
+        },
+        "experiment_id": {
+          "$ref": "summary.v1.schema.json#/properties/experiment_id"
+        },
+        "attempt": {
+          "$ref": "summary.v1.schema.json#/properties/attempt"
+        },
+        "project_id": {
+          "$ref": "summary.v1.schema.json#/properties/project_id"
+        },
+        "exit_code": {
+          "$ref": "summary.v1.schema.json#/properties/exit_code"
+        },
+        "workers": {
+          "$ref": "summary.v1.schema.json#/properties/workers"
+        },
+        "problem_size": {
+          "$ref": "summary.v1.schema.json#/properties/problem_size"
+        },
+        "repeat": {
+          "$ref": "summary.v1.schema.json#/properties/repeat"
+        },
+        "fingerprint": {
+          "$ref": "summary.v1.schema.json#/properties/fingerprint"
+        },
+        "work_units": {
+          "$ref": "summary.v1.schema.json#/properties/work_units"
+        },
+        "results": {
+          "$ref": "summary.v1.schema.json#/properties/results"
+        },
+        "metadata": {
+          "$ref": "summary.v1.schema.json#/properties/metadata"
+        },
+        "est_start": {
+          "anyOf": [
+            {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 253402300799,
+              "description": "Unix epoch seconds in UTC. Omit or use null when unknown; never local time strings."
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "reason": {
+          "type": "string",
+          "minLength": 0,
+          "maxLength": 1024,
+          "pattern": "^[^\\u0000-\\u001f\\u007f-\\u009f]*$"
+        },
+        "dependency": {
+          "type": "string",
+          "minLength": 0,
+          "maxLength": 4096,
+          "pattern": "^[^\\u0000-\\u001f\\u007f-\\u009f]*$"
+        },
+        "limit": {
+          "type": "string",
+          "minLength": 0,
+          "maxLength": 64,
+          "pattern": "^[^\\u0000-\\u001f\\u007f-\\u009f]*$"
+        },
+        "limit_s": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1e+100
+        },
+        "mem_req": {
+          "type": "string",
+          "minLength": 0,
+          "maxLength": 64,
+          "pattern": "^[^\\u0000-\\u001f\\u007f-\\u009f]*$"
+        },
+        "req_mem": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1e+100
+        },
+        "priority": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1e+100
+        },
+        "array_job_id": {
+          "type": "string",
+          "minLength": 0,
+          "maxLength": 128,
+          "pattern": "^[^\\u0000-\\u001f\\u007f-\\u009f]*$"
+        },
+        "array_task_id": {
+          "type": "string",
+          "minLength": 0,
+          "maxLength": 128,
+          "pattern": "^[^\\u0000-\\u001f\\u007f-\\u009f]*$"
+        },
+        "user": {
+          "type": "string",
+          "minLength": 0,
+          "maxLength": 128,
+          "pattern": "^[^\\u0000-\\u001f\\u007f-\\u009f]*$"
+        }
+      },
+      "additionalProperties": true
+    },
+    "forecastObservation": {
+      "type": "object",
+      "required": [
+        "job_id",
+        "submit",
+        "issued_at",
+        "predicted_start"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "$ref": "summary.v1.schema.json#/properties/name"
+        },
+        "partition": {
+          "$ref": "summary.v1.schema.json#/properties/partition"
+        },
+        "account": {
+          "$ref": "summary.v1.schema.json#/properties/account"
+        },
+        "qos": {
+          "$ref": "summary.v1.schema.json#/properties/qos"
+        },
+        "cpus": {
+          "$ref": "summary.v1.schema.json#/properties/cpus"
+        },
+        "nodes": {
+          "$ref": "summary.v1.schema.json#/properties/nodes"
+        },
+        "gpus": {
+          "$ref": "summary.v1.schema.json#/properties/gpus"
+        },
+        "gpu_type": {
+          "$ref": "summary.v1.schema.json#/properties/gpu_type"
+        },
+        "mem_bytes": {
+          "$ref": "summary.v1.schema.json#/properties/mem_bytes"
+        },
+        "time_seconds": {
+          "$ref": "summary.v1.schema.json#/properties/time_seconds"
+        },
+        "job_id": {
+          "allOf": [
+            {
+              "$ref": "summary.v1.schema.json#/properties/job_id"
+            },
+            {
+              "not": {
+                "type": "null"
+              }
+            }
+          ]
+        },
+        "submit": {
+          "allOf": [
+            {
+              "$ref": "summary.v1.schema.json#/properties/submit"
+            },
+            {
+              "not": {
+                "type": "null"
+              }
+            }
+          ]
+        },
+        "issued_at": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 253402300799,
+          "description": "Unix epoch seconds in UTC. Omit or use null when unknown; never local time strings."
+        },
+        "predicted_start": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 253402300799,
+          "description": "Unix epoch seconds in UTC. Omit or use null when unknown; never local time strings."
+        },
+        "actual_start": {
+          "anyOf": [
+            {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 253402300799,
+              "description": "Unix epoch seconds in UTC. Omit or use null when unknown; never local time strings."
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "first_issued_at": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 253402300799,
+          "description": "Unix epoch seconds in UTC. Omit or use null when unknown; never local time strings."
+        },
+        "first_predicted_start": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 253402300799,
+          "description": "Unix epoch seconds in UTC. Omit or use null when unknown; never local time strings."
+        },
+        "last_observed_at": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 253402300799,
+          "description": "Unix epoch seconds in UTC. Omit or use null when unknown; never local time strings."
+        },
+        "revision_count": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 2147483647
+        },
+        "time_basis": {
+          "enum": [
+            "epoch",
+            "local_assumed"
+          ]
+        }
+      },
+      "description": "Observed scheduler point and outcome, recorded before the actual start. Never backfill guessed issued_at or predicted_start. Native calibration additionally checks chronology, distinct submitted-job identities, matching resource cohorts, and forecast lead bands."
+    },
+    "candidate": {
+      "type": "object",
+      "required": [
+        "name",
+        "partition",
+        "cpus",
+        "nodes",
+        "gpus",
+        "mem_bytes",
+        "time_seconds"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "$ref": "summary.v1.schema.json#/properties/name"
+        },
+        "partition": {
+          "allOf": [
+            {
+              "$ref": "summary.v1.schema.json#/properties/partition"
+            },
+            {
+              "not": {
+                "type": "null"
+              }
+            }
+          ]
+        },
+        "account": {
+          "allOf": [
+            {
+              "$ref": "summary.v1.schema.json#/properties/account"
+            },
+            {
+              "not": {
+                "type": "null"
+              }
+            }
+          ]
+        },
+        "qos": {
+          "allOf": [
+            {
+              "$ref": "summary.v1.schema.json#/properties/qos"
+            },
+            {
+              "not": {
+                "type": "null"
+              }
+            }
+          ]
+        },
+        "cpus": {
+          "allOf": [
+            {
+              "$ref": "summary.v1.schema.json#/properties/cpus"
+            },
+            {
+              "not": {
+                "type": "null"
+              }
+            }
+          ]
+        },
+        "nodes": {
+          "allOf": [
+            {
+              "$ref": "summary.v1.schema.json#/properties/nodes"
+            },
+            {
+              "not": {
+                "type": "null"
+              }
+            }
+          ]
+        },
+        "gpus": {
+          "allOf": [
+            {
+              "$ref": "summary.v1.schema.json#/properties/gpus"
+            },
+            {
+              "not": {
+                "type": "null"
+              }
+            }
+          ]
+        },
+        "gpu_type": {
+          "allOf": [
+            {
+              "$ref": "summary.v1.schema.json#/properties/gpu_type"
+            },
+            {
+              "not": {
+                "type": "null"
+              }
+            }
+          ]
+        },
+        "mem_bytes": {
+          "allOf": [
+            {
+              "$ref": "summary.v1.schema.json#/properties/mem_bytes"
+            },
+            {
+              "not": {
+                "type": "null"
+              }
+            }
+          ]
+        },
+        "time_seconds": {
+          "allOf": [
+            {
+              "$ref": "summary.v1.schema.json#/properties/time_seconds"
+            },
+            {
+              "not": {
+                "type": "null"
+              }
+            }
+          ]
+        },
+        "script_sha256": {
+          "allOf": [
+            {
+              "$ref": "summary.v1.schema.json#/properties/script_sha256"
+            },
+            {
+              "not": {
+                "type": "null"
+              }
+            }
+          ]
+        },
+        "input_size": {
+          "allOf": [
+            {
+              "$ref": "summary.v1.schema.json#/properties/input_size"
+            },
+            {
+              "not": {
+                "type": "null"
+              }
+            }
+          ]
+        },
+        "parameters": {
+          "$ref": "summary.v1.schema.json#/properties/parameters"
+        },
+        "label": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 512,
+          "pattern": "^[^\\u0000-\\u001f\\u007f-\\u009f]*$"
+        },
+        "estimated_runtime_seconds": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 3162240000,
+          "exclusiveMinimum": 0
+        }
+      },
+      "description": "Concrete prospective resource request. cpus/gpus/mem_bytes are allocation-wide totals. An estimated_runtime_seconds value is an explicit unvalidated assumption, never measured evidence. Native validation requires cpus>=nodes."
+    },
+    "scalingRecord": {
+      "type": "object",
+      "required": [
+        "workers",
+        "problem_size",
+        "parameters",
+        "script_sha256",
+        "state"
+      ],
+      "properties": {
+        "id": {
+          "$ref": "summary.v1.schema.json#/properties/id"
+        },
+        "name": {
+          "$ref": "summary.v1.schema.json#/properties/name"
+        },
+        "state": {
+          "$ref": "summary.v1.schema.json#/properties/state"
+        },
+        "partition": {
+          "$ref": "summary.v1.schema.json#/properties/partition"
+        },
+        "account": {
+          "$ref": "summary.v1.schema.json#/properties/account"
+        },
+        "qos": {
+          "$ref": "summary.v1.schema.json#/properties/qos"
+        },
+        "cpus": {
+          "$ref": "summary.v1.schema.json#/properties/cpus"
+        },
+        "nodes": {
+          "$ref": "summary.v1.schema.json#/properties/nodes"
+        },
+        "gpus": {
+          "$ref": "summary.v1.schema.json#/properties/gpus"
+        },
+        "gpu_type": {
+          "$ref": "summary.v1.schema.json#/properties/gpu_type"
+        },
+        "mem_bytes": {
+          "$ref": "summary.v1.schema.json#/properties/mem_bytes"
+        },
+        "time_seconds": {
+          "$ref": "summary.v1.schema.json#/properties/time_seconds"
+        },
+        "runtime_seconds": {
+          "$ref": "summary.v1.schema.json#/properties/runtime_seconds"
+        },
+        "memory_bytes": {
+          "$ref": "summary.v1.schema.json#/properties/memory_bytes"
+        },
+        "memory_scope": {
+          "$ref": "summary.v1.schema.json#/properties/memory_scope"
+        },
+        "cpu_seconds": {
+          "$ref": "summary.v1.schema.json#/properties/cpu_seconds"
+        },
+        "script_sha256": {
+          "allOf": [
+            {
+              "$ref": "summary.v1.schema.json#/properties/script_sha256"
+            },
+            {
+              "not": {
+                "type": "null"
+              }
+            }
+          ]
+        },
+        "parameters": {
+          "type": "object"
+        },
+        "input_size": {
+          "$ref": "summary.v1.schema.json#/properties/input_size"
+        },
+        "start": {
+          "$ref": "summary.v1.schema.json#/properties/start"
+        },
+        "end": {
+          "$ref": "summary.v1.schema.json#/properties/end"
+        },
+        "submit": {
+          "$ref": "summary.v1.schema.json#/properties/submit"
+        },
+        "job_id": {
+          "$ref": "summary.v1.schema.json#/properties/job_id"
+        },
+        "experiment_id": {
+          "$ref": "summary.v1.schema.json#/properties/experiment_id"
+        },
+        "attempt": {
+          "$ref": "summary.v1.schema.json#/properties/attempt"
+        },
+        "project_id": {
+          "$ref": "summary.v1.schema.json#/properties/project_id"
+        },
+        "exit_code": {
+          "$ref": "summary.v1.schema.json#/properties/exit_code"
+        },
+        "workers": {
+          "allOf": [
+            {
+              "$ref": "summary.v1.schema.json#/properties/workers"
+            },
+            {
+              "not": {
+                "type": "null"
+              }
+            }
+          ]
+        },
+        "problem_size": {
+          "allOf": [
+            {
+              "$ref": "summary.v1.schema.json#/properties/problem_size"
+            },
+            {
+              "not": {
+                "type": "null"
+              }
+            }
+          ]
+        },
+        "repeat": {
+          "$ref": "summary.v1.schema.json#/properties/repeat"
+        },
+        "fingerprint": {
+          "$ref": "summary.v1.schema.json#/properties/fingerprint"
+        },
+        "work_units": {
+          "$ref": "summary.v1.schema.json#/properties/work_units"
+        },
+        "results": {
+          "$ref": "summary.v1.schema.json#/properties/results"
+        },
+        "metadata": {
+          "$ref": "summary.v1.schema.json#/properties/metadata"
+        }
+      },
+      "anyOf": [
+        {
+          "required": [
+            "job_id"
+          ],
+          "properties": {
+            "job_id": {
+              "allOf": [
+                {
+                  "$ref": "summary.v1.schema.json#/properties/job_id"
+                },
+                {
+                  "not": {
+                    "type": "null"
+                  }
+                }
+              ]
+            }
+          }
+        },
+        {
+          "required": [
+            "repeat"
+          ],
+          "properties": {
+            "repeat": {
+              "allOf": [
+                {
+                  "$ref": "summary.v1.schema.json#/properties/repeat"
+                },
+                {
+                  "not": {
+                    "type": "null"
+                  }
+                }
+              ]
+            }
+          }
+        }
+      ],
+      "additionalProperties": true,
+      "description": "Flat explicitly identified scaling observations, including censored/failed attempts. COMPLETED records need runtime >=1e-9s. Native validation checks comparability, duplicate identities, metadata limits, and numeric bounds before using observations."
+    },
+    "workflowRecipe": {
+      "type": "object",
+      "required": [
+        "version",
+        "kind",
+        "nodes"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "version": {
+          "type": "integer",
+          "const": 1
+        },
+        "kind": {
+          "const": "tower.workflow"
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256,
+          "pattern": "^[^\\u0000-\\u001f\\u007f-\\u009f]*$"
+        },
+        "label": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256,
+          "pattern": "^[^\\u0000-\\u001f\\u007f-\\u009f]*$"
+        },
+        "description": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 4096,
+          "pattern": "^[^\\u0000-\\u001f\\u007f-\\u009f]*$"
+        },
+        "deadline": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1000000000000000
+        },
+        "deadline_seconds": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1000000000000
+        },
+        "nodes": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 512,
+          "items": {
+            "type": "object",
+            "required": [
+              "id"
+            ],
+            "additionalProperties": false,
+            "properties": {
+              "id": {
+                "type": "string",
+                "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]{0,63}$"
+              },
+              "label": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 256,
+                "pattern": "^[^\\u0000-\\u001f\\u007f-\\u009f]*$"
+              },
+              "script": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 4096,
+                "pattern": "^[^\\u0000-\\u001f\\u007f-\\u009f]*$"
+              },
+              "depends_on": {
+                "type": "array",
+                "maxItems": 512,
+                "uniqueItems": true,
+                "items": {
+                  "type": "string",
+                  "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]{0,63}$"
+                }
+              },
+              "runtime_seconds": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1000000000000,
+                "exclusiveMinimum": 0
+              },
+              "duration": {
+                "type": "object",
+                "required": [
+                  "lower",
+                  "estimate",
+                  "upper"
+                ],
+                "additionalProperties": false,
+                "properties": {
+                  "lower": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 1000000000000,
+                    "exclusiveMinimum": 0
+                  },
+                  "estimate": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 1000000000000,
+                    "exclusiveMinimum": 0
+                  },
+                  "upper": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 1000000000000,
+                    "exclusiveMinimum": 0
+                  }
+                }
+              },
+              "resources": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "cpus_per_task": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 2147483647
+                  },
+                  "ntasks": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 2147483647
+                  },
+                  "ntasks_per_node": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 2147483647
+                  },
+                  "nodes": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 2147483647
+                  },
+                  "gpus": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 2147483647
+                  },
+                  "mem": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 256,
+                    "pattern": "^[0-9]+(?:\\.[0-9]+)?[KMGTkmgt]?$"
+                  },
+                  "time": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 256,
+                    "pattern": "^[^\\u0000-\\u001f\\u007f-\\u009f]*$"
+                  },
+                  "partition": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 256,
+                    "pattern": "^[^\\u0000-\\u001f\\u007f-\\u009f]*$"
+                  },
+                  "account": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 256,
+                    "pattern": "^[^\\u0000-\\u001f\\u007f-\\u009f]*$"
+                  },
+                  "qos": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 256,
+                    "pattern": "^[^\\u0000-\\u001f\\u007f-\\u009f]*$"
+                  },
+                  "constraint": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 256,
+                    "pattern": "^[^\\u0000-\\u001f\\u007f-\\u009f]*$"
+                  }
+                },
+                "not": {
+                  "required": [
+                    "ntasks",
+                    "ntasks_per_node"
+                  ]
+                },
+                "description": "Native lexical Slurm walltime validation remains authoritative. CPU/GPU quantities here are recipe options, not the flat summary's recorded allocation totals."
+              },
+              "parameters": {
+                "type": "object",
+                "description": "Native workflow metadata is finite JSON with at most eight nesting levels, 2048 values, and 128 KiB text; use the smaller shared parameter profile when comparing run summaries."
+              }
+            },
+            "not": {
+              "required": [
+                "runtime_seconds",
+                "duration"
+              ]
+            }
+          }
+        }
+      },
+      "not": {
+        "required": [
+          "deadline",
+          "deadline_seconds"
+        ]
+      },
+      "description": "Native validation additionally requires unique node IDs, known dependency targets, an acyclic DAG, <=4096 edges, and lower <= estimate <= upper duration scenarios. Scripts are needed for plans, optional for analysis. Planning does not orchestrate or submit the DAG."
+    },
+    "scalingRecipe": {
+      "type": "object",
+      "required": [
+        "version",
+        "kind",
+        "script",
+        "configurations"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "version": {
+          "type": "integer",
+          "const": 1
+        },
+        "kind": {
+          "const": "tower.scaling"
+        },
+        "script": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 4096,
+          "pattern": "^[^\\u0000-\\u001f\\u007f-\\u009f]*$"
+        },
+        "workdir": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 4096,
+          "pattern": "^[^\\u0000-\\u001f\\u007f-\\u009f]*$"
+        },
+        "mode": {
+          "enum": [
+            "strong",
+            "weak"
+          ]
+        },
+        "baseline": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 1000000
+        },
+        "repeats": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 20
+        },
+        "seed": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 2147483627
+        },
+        "max_runs": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 128
+        },
+        "problem_size": {
+          "allOf": [
+            {
+              "$ref": "summary.v1.schema.json#/properties/problem_size"
+            },
+            {
+              "not": {
+                "type": "null"
+              }
+            }
+          ]
+        },
+        "parameters": {
+          "type": "object",
+          "maxProperties": 64,
+          "propertyNames": {
+            "type": "string",
+            "pattern": "^[A-Za-z_][A-Za-z0-9_]{0,63}$"
+          },
+          "additionalProperties": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 1024,
+                "pattern": "^[^\\u0000-\\u001f\\u007f-\\u009f]*$"
+              },
+              {
+                "type": "number"
+              },
+              {
+                "type": "boolean"
+              }
+            ]
+          },
+          "description": "Scaling recipe exports explicit scalar parameters as TOWER_PARAM_<NAME>. Native validation rejects commas, control characters, secret-like/reserved names, and case-insensitive export collisions. The workload must consume these values."
+        },
+        "name": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]{0,47}$"
+        },
+        "configurations": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 128,
+          "items": {
+            "type": "object",
+            "required": [
+              "workers"
+            ],
+            "additionalProperties": false,
+            "properties": {
+              "label": {
+                "type": "string",
+                "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]{0,47}$"
+              },
+              "workers": {
+                "allOf": [
+                  {
+                    "$ref": "summary.v1.schema.json#/properties/workers"
+                  },
+                  {
+                    "not": {
+                      "type": "null"
+                    }
+                  }
+                ]
+              },
+              "cpus_per_task": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 2147483647
+              },
+              "nodes": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 1000000
+              },
+              "gpus": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 2147483647
+              },
+              "parameters": {
+                "type": "object",
+                "maxProperties": 64,
+                "propertyNames": {
+                  "type": "string",
+                  "pattern": "^[A-Za-z_][A-Za-z0-9_]{0,63}$"
+                },
+                "additionalProperties": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 1024,
+                      "pattern": "^[^\\u0000-\\u001f\\u007f-\\u009f]*$"
+                    },
+                    {
+                      "type": "number"
+                    },
+                    {
+                      "type": "boolean"
+                    }
+                  ]
+                },
+                "description": "Scaling recipe exports explicit scalar parameters as TOWER_PARAM_<NAME>. Native validation rejects commas, control characters, secret-like/reserved names, and case-insensitive export collisions. The workload must consume these values."
+              },
+              "problem_size": {
+                "allOf": [
+                  {
+                    "$ref": "summary.v1.schema.json#/properties/problem_size"
+                  },
+                  {
+                    "not": {
+                      "type": "null"
+                    }
+                  }
+                ]
+              }
+            }
+          }
+        }
+      },
+      "description": "Native validation checks total requested CPUs workers*cpus_per_task <=2147483647, nodes<=workers, unique worker counts/labels, explicit baseline membership, repeats*configurations<=max_runs (default64), comparable parameters, and fixed strong/proportional weak problem sizes."
+    }
+  },
+  "$comment": "Default native command/UI loader caps each JSON document at 1 MiB, max depth32, 100000 values, finite numbers and bounded integers; it refuses duplicate keys, symlinks/devices, and files that change during a read. Keep aggregates under these limits. now freezes historical/example analysis; omit it for current forecasts."
+}

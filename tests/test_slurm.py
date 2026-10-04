@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import csv
 import fcntl
+import json
 import os
 from pathlib import Path
 import shlex
@@ -46,6 +47,7 @@ class SlurmWorkflowTests(unittest.TestCase):
         self.calls = Path(self.temp.name) / "sbatch-calls.txt"
         self.counter = Path(self.temp.name) / "counter"
         self.counter.write_text("100\n")
+        self.tower_calls = Path(self.temp.name) / "tower-calls.jsonl"
         self.stub("id", "printf 'aadaniel\\n'\n")
         self.stub("squeue", 'if [[ " $* " = *" -u "* ]]; then printf "%s" "${MOCK_USER_QUEUE:-${MOCK_QUEUE:-}}"; else printf "%s" "${MOCK_ACCOUNT_QUEUE:-${MOCK_QUEUE:-}}"; fi\n')
         self.stub("sbatch", """n=$(cat "$MOCK_COUNTER")
@@ -57,7 +59,8 @@ if [[ ${MOCK_FAIL_STAGE:-} != '' && " $* " = *" ${MOCK_FAIL_STAGE} "* ]]; then e
 printf '%s;mockcluster\\n' "$n"
 """)
         self.env = dict(os.environ, SSMO_PROJECT_ROOT=str(self.root), MOCK_CALLS=str(self.calls),
-                        MOCK_COUNTER=str(self.counter), PATH=f"{self.bin}:{os.environ['PATH']}")
+                        MOCK_COUNTER=str(self.counter), MOCK_TOWER_CALLS=str(self.tower_calls),
+                        PATH=f"{self.bin}:{os.environ['PATH']}")
         self.env.pop("SSMO_ROOT", None)
         self.discovery = self.root / "runs" / "observed" / "discovery"
         self.discovery.mkdir(parents=True)
@@ -87,6 +90,43 @@ printf '%s;mockcluster\\n' "$n"
         path = self.bin / name
         path.write_text("#!/bin/bash\nset -euo pipefail\n" + body)
         path.chmod(0o700)
+
+    def batch_fixture(self, stage="validate", profile="cpu", run_id="job"):
+        """Mock only producer/srun boundaries; never execute research work."""
+        self.stub("module", "exit 0\n")
+        source = self.root / "runs" / run_id / "source"
+        source.mkdir(parents=True)
+        shutil.copytree(self.root / "scripts", source / "scripts")
+        package = source / "singular_sensitivity"
+        package.mkdir()
+        (package / "__init__.py").write_text("")
+        (package / "tower_reporting.py").write_text(
+            "import json, os, pathlib, sys\n"
+            "with open(os.environ['MOCK_TOWER_CALLS'], 'a') as out:\n"
+            "    out.write(json.dumps(sys.argv[1:]) + '\\n')\n"
+            "if sys.argv[1] == 'start':\n"
+            "    path = pathlib.Path(sys.argv[sys.argv.index('--attempt-dir') + 1])\n"
+            "    (path / 'logs').mkdir()\n"
+            "    for name in ('application.stdout.log', 'application.stderr.log'):\n"
+            "        (path / 'logs' / name).touch()\n"
+            "    (path / 'mock-gpu-trace.json').write_text(json.dumps({key: os.environ.get(key) for key in\n"
+            "        ('SSMO_TOWER_GPU_TRACE_STATUS', 'SSMO_TOWER_GPU_TRACE_REASON', 'SSMO_TOWER_GPU_TRACE_SELECTOR')}))\n"
+            "    sys.exit(int(os.environ.get('MOCK_TOWER_START_EXIT', '0')))\n"
+            "sys.exit(int(os.environ.get('MOCK_TOWER_FINISH_EXIT', '0')))\n"
+        )
+        run = self.root / "runs" / run_id
+        (run / "logs").mkdir()
+        attempt = run / "tower" / f"01-{stage}-measure-seed7"
+        attempt.mkdir(parents=True)
+        args = [stage, str(run), str(self.root / "configs" / "carc_smoke.yaml"),
+                str(source), profile, "measure", "7", "none", "none"]
+        env = dict(self.env, SLURM_JOB_ID="22", SLURM_JOB_ACCOUNT="anakano_81",
+                   SSMO_TOWER_RUN_DIR=str(attempt), SSMO_TOWER_CPUS="2",
+                   SSMO_TOWER_MEM_GB="4", SSMO_TOWER_WALLTIME="00:10:00",
+                   SSMO_TOWER_GPU_COUNT="0", SSMO_TOWER_GPU_TYPE="",
+                   SSMO_TOWER_SCHEDULER_OUT=str(run / "logs" / f"{stage}-measure-%j.out"),
+                   SSMO_TOWER_SCHEDULER_ERR=str(run / "logs" / f"{stage}-measure-%j.err"))
+        return args, env, attempt
 
     def run_wrapper(self, *args, live=False):
         flags = ["--run-id", "fixture"]
@@ -167,11 +207,18 @@ printf '%s;mockcluster\\n' "$n"
         commands = [shlex.split(line) for line in result.stdout.splitlines() if line.startswith("sbatch ")]
         self.assertEqual(len(commands), 7)
         self.assertTrue(all("--account=anakano_81" in cmd for cmd in commands))
+        self.assertTrue(all("--nodes=1" in cmd for cmd in commands))
         self.assertIn("--dependency=afterok:77", commands[0])
         self.assertIn("--partition=main", commands[0])
         self.assertIn("--partition=gpu", commands[3])
         self.assertIn("--gpus-per-task=a100:1", commands[3])
         self.assertIn("--constraint=a100-40gb", commands[3])
+        for index, command in enumerate(commands, start=1):
+            workdir = next(arg.removeprefix("--chdir=") for arg in command if arg.startswith("--chdir="))
+            self.assertTrue(workdir.startswith(f"{self.root}/runs/fixture/tower/{index:02d}-"))
+            exported = next(arg for arg in command if arg.startswith("--export="))
+            self.assertIn(f"SSMO_TOWER_RUN_DIR={workdir}", exported)
+            self.assertIn("SSMO_TOWER_GPU_COUNT=" + ("1" if "--partition=gpu" in command else "0"), exported)
         self.assertFalse(self.calls.exists())
         self.assertFalse((self.root / "runs" / "fixture").exists())
         self.assertFalse((self.root / "local").exists())
@@ -189,6 +236,10 @@ printf '%s;mockcluster\\n' "$n"
         self.assertFalse((run / "source" / "runs").exists())
         self.assertEqual((run / "source" / "README.md").read_text(), "immutable source\n")
         self.assertFalse((run / "source" / "README.md").stat().st_mode & 0o222)
+        attempts = sorted((run / "tower").iterdir())
+        self.assertEqual(len(attempts), 7)
+        self.assertTrue(all(path.is_dir() and not any(path.iterdir()) for path in attempts))
+        self.assertFalse((run / "source" / "tower").exists())
         (self.root / "README.md").write_text("later edit\n")
         self.assertEqual((run / "source" / "README.md").read_text(), "immutable source\n")
         duplicate = self.run_wrapper(live=True)
@@ -393,9 +444,20 @@ printf '%s;mockcluster\\n' "$n"
         cache = self.root / ".cache"
         cache.mkdir()
         (cache / "large-generated.dat").write_bytes(b"generated data")
+        integration = self.root / ".tower"
+        integration.mkdir()
+        (integration / "config.json").write_text('{"logs":{"manifest_file":"logs.json"}}\n')
+        for directory in ("contracts", "schemas", "definitions", "passports"):
+            (integration / directory).mkdir()
+            (integration / directory / "example.json").write_text("{}\n")
         result = self.run_wrapper(live=True)
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertFalse((self.root / "runs" / "fixture" / "source" / ".cache").exists())
+        frozen = self.root / "runs" / "fixture" / "source" / ".tower"
+        self.assertTrue((frozen / "config.json").is_file())
+        for directory in ("contracts", "schemas", "definitions"):
+            self.assertTrue((frozen / directory / "example.json").is_file())
+        self.assertFalse((frozen / "passports").exists())
         (self.root / "configs" / "mutable.yaml").symlink_to(self.root / "README.md")
         result = self.run_wrapper("--run-id", "new", live=True)
         self.assertNotEqual(result.returncode, 0)
@@ -469,7 +531,9 @@ printf '%s;mockcluster\\n' "$n"
         self.stub("module", "exit 0\n")
         # Slurm starts a separate task process; an allocation-shell descriptor
         # cannot supply its lock. The stage must open its own descriptor.
-        self.stub("srun", 'exec 9>&-\nshift 2\nexec "$@"\n')
+        self.stub("srun", 'exec 9>&-\nwhile [[ "$1" = --* ]]; do\n'
+                  'case "$1" in --output=*) app_out=${1#--output=} ;; --error=*) app_err=${1#--error=} ;; esac\n'
+                  'shift\ndone\nexec "$@" > "$app_out" 2> "$app_err"\n')
         lock_check = self.bin / "network_flock.py"
         lock_check.write_text(
             "import fcntl, os, sys\n"
@@ -486,23 +550,21 @@ printf '%s;mockcluster\\n' "$n"
         interpreter = venv / "bin" / "python"
         interpreter.write_text(
             '#!/bin/bash\nset -euo pipefail\n'
+            f'if [[ "${{1:-}} ${{2:-}} ${{3:-}} ${{4:-}}" = "-B -S -m singular_sensitivity.tower_reporting" ]]; then exec {shlex.quote(sys.executable)} "$@"; fi\n'
             'if [[ " $* " = *" pip freeze "* ]]; then printf "torch==2.10.0+cu126\\n"; exit 0; fi\n'
             '[[ "$1 $2 $3" = "-m singular_sensitivity.cli audit" ]] || exit 99\n'
             f'if {shlex.quote(real_flock)} -n -x "$SSMO_PROJECT_ROOT/local/venv.lock" -c true; then '
             'printf "shared lock missing during computation\\n" >&2; exit 99; fi\n'
             'printf "mock validation completed with shared lock\\n"\n'
         )
-        source = self.root / "runs" / "job" / "source"
-        source.mkdir(parents=True)
-        shutil.copytree(self.root / "scripts", source / "scripts")
-        args = ["validate", str(self.root / "runs" / "job"),
-                str(self.root / "configs" / "carc_smoke.yaml"), str(source),
-                "cpu", "measure", "7", "none", "none"]
-        env = dict(self.env, SLURM_JOB_ID="22", SLURM_JOB_ACCOUNT="anakano_81")
+        args, env, attempt = self.batch_fixture()
         result = subprocess.run(["bash", str(self.root / "slurm" / "stage.sbatch"), *args],
                                 env=env, capture_output=True, text=True)
         self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertIn("mock validation completed with shared lock", result.stdout)
+        self.assertIn("mock validation completed with shared lock", (attempt / "logs/application.stdout.log").read_text())
+        calls = [json.loads(line) for line in self.tower_calls.read_text().splitlines()]
+        self.assertEqual([call[0] for call in calls], ["start", "finish"])
+        self.assertEqual(calls[-1][-2:], ["--exit-code", "0"])
         released = subprocess.run([real_flock, "-n", "-x", str(self.root / "local/venv.lock"),
                                    "-c", "true"], capture_output=True, text=True)
         self.assertEqual(released.returncode, 0, released.stderr)
@@ -541,14 +603,136 @@ printf '%s;mockcluster\\n' "$n"
                 self.assertIn("set -euo pipefail", text, path)
             subprocess.run(["bash", "-n", str(path)], check=True)
         # Run only a mocked srun; actual tasks are never executed by this test.
-        self.stub("srun", "exit 23\n")
-        source = self.root / "runs" / "job" / "source"
-        source.mkdir(parents=True)
-        shutil.copytree(self.root / "scripts", source / "scripts")
-        args = ["validate", str(self.root / "runs" / "job"), str(self.root / "configs" / "carc_smoke.yaml"), str(source), "cpu", "measure", "7", "none", "none"]
-        env = dict(self.env, SLURM_JOB_ID="22", SLURM_JOB_ACCOUNT="anakano_81")
-        result = subprocess.run(["bash", str(self.root / "slurm" / "stage.sbatch"), *args], env=env, capture_output=True, text=True)
-        self.assertEqual(result.returncode, 23, result.stderr)
+        for exit_code in (0, 23, 75, 143):
+            with self.subTest(exit_code=exit_code):
+                self.stub("srun", f"exit {exit_code}\n")
+                args, env, attempt = self.batch_fixture(run_id=f"status-{exit_code}")
+                result = subprocess.run(["bash", str(self.root / "slurm" / "stage.sbatch"), *args], env=env, capture_output=True, text=True)
+                self.assertEqual(result.returncode, exit_code, result.stderr)
+                calls = [json.loads(line) for line in self.tower_calls.read_text().splitlines()]
+                self.assertEqual(calls[-1], ["finish", "--attempt-dir", str(attempt), "--exit-code", str(exit_code)])
+                start = calls[-2]
+                self.assertEqual(start[start.index("--scheduler-out") + 1], str(attempt.parents[1] / "logs/validate-measure-22.out"))
+                self.assertEqual(start[start.index("--request-gpus") + 1], "0")
+                self.assertEqual(start[start.index("--request-nodes") + 1], "1")
+
+    def test_reporting_failure_retains_original_task_status_and_logs(self):
+        self.stub("srun", "exit 75\n")
+        args, env, attempt = self.batch_fixture()
+        env["MOCK_TOWER_FINISH_EXIT"] = "19"
+        result = subprocess.run(["bash", str(self.root / "slurm" / "stage.sbatch"), *args],
+                                env=env, capture_output=True, text=True)
+        self.assertEqual(result.returncode, 75, result.stderr)
+        self.assertIn("reporting finalization failed", result.stderr)
+        self.assertTrue((attempt / "logs/application.stderr.log").is_file())
+        calls = [json.loads(line) for line in self.tower_calls.read_text().splitlines()]
+        self.assertEqual(calls[-1][-1], "75")
+
+    def test_reporting_start_failure_preserves_attempt_and_prevents_computation(self):
+        self.stub("srun", 'printf "forbidden computation\\n" >&2\nexit 99\n')
+        args, env, attempt = self.batch_fixture(stage="install")
+        env["MOCK_TOWER_START_EXIT"] = "17"
+        result = subprocess.run(["bash", str(self.root / "slurm" / "stage.sbatch"), *args],
+                                env=env, capture_output=True, text=True)
+        self.assertEqual(result.returncode, 17, result.stderr)
+        self.assertNotIn("forbidden computation", result.stderr)
+        self.assertTrue((attempt / "logs").is_dir())
+        calls = [json.loads(line) for line in self.tower_calls.read_text().splitlines()]
+        self.assertEqual([call[0] for call in calls], ["start"])
+
+    def test_task_signal_exit_is_recorded_without_scheduler_cause_inference(self):
+        self.stub("srun", "kill -TERM $$\n")
+        args, env, attempt = self.batch_fixture()
+        result = subprocess.run(["bash", str(self.root / "slurm" / "stage.sbatch"), *args],
+                                env=env, capture_output=True, text=True)
+        self.assertEqual(result.returncode, 143, result.stderr)
+        calls = [json.loads(line) for line in self.tower_calls.read_text().splitlines()]
+        self.assertEqual(calls[-1][-1], "143")
+        self.assertNotIn("TIMEOUT", result.stdout + result.stderr)
+        self.assertNotIn("OUT_OF_MEMORY", result.stdout + result.stderr)
+
+    def test_native_gpu_trace_uses_one_physical_selector_and_cleans_owned_sampler(self):
+        trace_calls = self.bin / "nvidia-calls.json"
+        trace_stopped = self.bin / "nvidia-stopped.txt"
+        sampler = self.bin / "mock_sampler.py"
+        sampler.write_text(
+            "import json, os, pathlib, signal, sys\n"
+            f"calls = pathlib.Path({str(trace_calls)!r})\n"
+            f"stopped = pathlib.Path({str(trace_stopped)!r})\n"
+            "def finish(signum, frame):\n"
+            "    stopped.write_text(str(os.getpid()))\n"
+            "    sys.exit(0)\n"
+            "signal.signal(signal.SIGTERM, finish)\n"
+            "print('2026/10/04 00:00:00.000, 2, 7, 1024', flush=True)\n"
+            "calls.write_text(json.dumps({'pid': os.getpid(), 'arguments': sys.argv[1:]}))\n"
+            "signal.pause()\n"
+        )
+        self.stub("nvidia-smi", f"exec {shlex.quote(sys.executable)} -B -S {shlex.quote(str(sampler))} \"$@\"\n")
+        self.stub("srun", f"for attempt in {{1..200}}; do [[ -s {shlex.quote(str(trace_calls))} ]] && exit 75; sleep 0.01; done\nexit 99\n")
+        selectors = ("2", "GPU-12345678-1234-1234-1234-123456789abc")
+        for index, selector in enumerate(selectors):
+            with self.subTest(selector=selector):
+                trace_calls.unlink(missing_ok=True)
+                trace_stopped.unlink(missing_ok=True)
+                args, env, attempt = self.batch_fixture(stage="train", profile="a10040", run_id=f"trace-{index}")
+                env.update(SSMO_TOWER_GPU_COUNT="1", SSMO_TOWER_GPU_TYPE="a100",
+                           SLURM_JOB_NUM_NODES="1", SLURM_JOB_GPUS=selector)
+                result = subprocess.run(["bash", str(self.root / "slurm/stage.sbatch"), *args],
+                                        env=env, capture_output=True, text=True)
+                self.assertEqual(result.returncode, 75, result.stderr)
+                calls = json.loads(trace_calls.read_text())
+                self.assertEqual(calls["arguments"], ["--query-gpu=timestamp,index,utilization.gpu,memory.used",
+                                                      "--format=csv,noheader,nounits", f"--id={selector}", "--loop=60"])
+                self.assertEqual(trace_stopped.read_text(), str(calls["pid"]))
+                with self.assertRaises(ProcessLookupError):
+                    os.kill(calls["pid"], 0)
+                self.assertIn(", 2, 7, 1024", (attempt / "logs/gpu-util-22.csv").read_text())
+                context = json.loads((attempt / "mock-gpu-trace.json").read_text())
+                self.assertEqual(context["SSMO_TOWER_GPU_TRACE_SELECTOR"], selector)
+                self.assertEqual(context["SSMO_TOWER_GPU_TRACE_STATUS"], "eligible")
+
+    def test_native_gpu_trace_skips_unverified_selectors_and_node_counts(self):
+        self.stub("nvidia-smi", 'printf "forbidden GPU probe\\n" >&2\nexit 99\n')
+        self.stub("srun", "exit 0\n")
+        cases = [({}, "unverified_single_node"),
+                 ({"SLURM_JOB_NUM_NODES": "2", "SLURM_JOB_GPUS": "0"}, "unverified_single_node"),
+                 ({"SLURM_JOB_NUM_NODES": "1", "SLURM_NNODES": "2", "SLURM_JOB_GPUS": "0"}, "unverified_single_node")]
+        for selector in ("", "0,1", "0-1", "cuda:0", "MIG-GPU-123", "GPU-not-a-uuid"):
+            cases.append(({"SLURM_JOB_NUM_NODES": "1", "SLURM_JOB_GPUS": selector}, "missing_physical_selector"))
+        for index, (updates, reason) in enumerate(cases):
+            with self.subTest(updates=updates):
+                args, env, attempt = self.batch_fixture(stage="train", profile="a10040", run_id=f"skip-{index}")
+                env.pop("SLURM_JOB_NUM_NODES", None)
+                env.pop("SLURM_NNODES", None)
+                env.pop("SLURM_JOB_GPUS", None)
+                env.update(SSMO_TOWER_GPU_COUNT="1", SSMO_TOWER_GPU_TYPE="a100", **updates)
+                result = subprocess.run(["bash", str(self.root / "slurm/stage.sbatch"), *args],
+                                        env=env, capture_output=True, text=True)
+                self.assertEqual(result.returncode, 0, result.stderr)
+                self.assertNotIn("forbidden GPU probe", result.stderr)
+                self.assertFalse((attempt / "logs/gpu-util-22.csv").exists())
+                context = json.loads((attempt / "mock-gpu-trace.json").read_text())
+                self.assertEqual(context["SSMO_TOWER_GPU_TRACE_STATUS"], "skipped")
+                self.assertEqual(context["SSMO_TOWER_GPU_TRACE_REASON"], reason)
+                self.assertIsNone(context["SSMO_TOWER_GPU_TRACE_SELECTOR"])
+
+    def test_native_gpu_trace_skips_cpu_jobs_and_explicit_disablement(self):
+        self.stub("nvidia-smi", 'printf "forbidden GPU probe\\n" >&2\nexit 99\n')
+        self.stub("srun", "exit 0\n")
+        for index, (gpu_count, preference, reason) in enumerate((("0", "1", "cpu_request"),
+                                                               ("1", "0", "disabled"),
+                                                               ("1", "invalid", "invalid_trace_preference"))):
+            with self.subTest(reason=reason):
+                args, env, attempt = self.batch_fixture(run_id=f"disabled-{index}")
+                env.update(SSMO_TOWER_GPU_COUNT=gpu_count, SSMO_TOWER_GPU_TRACE=preference,
+                           SLURM_JOB_NUM_NODES="1", SLURM_JOB_GPUS="0")
+                result = subprocess.run(["bash", str(self.root / "slurm/stage.sbatch"), *args],
+                                        env=env, capture_output=True, text=True)
+                self.assertEqual(result.returncode, 0, result.stderr)
+                self.assertNotIn("forbidden GPU probe", result.stderr)
+                self.assertFalse((attempt / "logs/gpu-util-22.csv").exists())
+                context = json.loads((attempt / "mock-gpu-trace.json").read_text())
+                self.assertEqual(context["SSMO_TOWER_GPU_TRACE_REASON"], reason)
 
 
 if __name__ == "__main__":

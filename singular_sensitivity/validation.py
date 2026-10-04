@@ -6,6 +6,7 @@ examples. Numerical LP diagnostics are explicitly not rigorous certificates.
 """
 from dataclasses import asdict
 import json
+import os
 from pathlib import Path
 import time
 
@@ -177,6 +178,7 @@ def representation_rows(parent, direction, queries, resolutions=(32, 64, 128),
 def representation_study(config, run_dir):
     """Standalone WP2 audit on fixed analytic controls; writes fresh artifacts."""
     from .runtime import atomic_write_json, confined_path
+    from .tower_reporting import emit_event
     started = time.perf_counter()
     run_dir = confined_path(run_dir)
     run_dir.mkdir(parents=True, exist_ok=True)
@@ -195,7 +197,7 @@ def representation_study(config, run_dir):
                 ParentInput("wp2-post-collision", "collision", (1.0, 0.0, -1.0, -0.4, 0.4), 1.1, domain)]
     count, errors, unresolved = 0, {}, 0
     with output.open("x") as stream:
-        for parent in examples:
+        for completed, parent in enumerate(examples, 1):
             direction = np.asarray((0.2, -0.3, 0.4) if len(parent.parameters) == 3 else (0.2, -0.1, -0.3, 0.3, -0.2))
             direction /= np.linalg.norm(direction)
             for row in representation_rows(parent, direction, queries,
@@ -206,6 +208,9 @@ def representation_study(config, run_dir):
                 unresolved += row.get("status") == "unresolved"
                 if "absolute_error" in row:
                     errors.setdefault(row["method"], []).append(row["absolute_error"])
+            if os.environ.get("SSMO_TOWER_ACTIVE_COMMAND") == "representation":
+                emit_event("representation", {"representation_raw_rows": count, "representation_unresolved_rows": unresolved},
+                           step=completed, completed=completed, total=len(examples), unit="physical parents")
     report = {"status": "completed_scoped_representation_audit", "physical_parents": len(examples), "raw_rows": count,
               "unresolved_rows": unresolved, "raw_artifact": str(output), "wall_seconds": time.perf_counter() - started,
               "diagnostic_errors": {m: {"mean": float(np.mean(e)), "worst": float(np.max(e))} for m, e in errors.items()},
@@ -342,6 +347,7 @@ def evaluate(config: dict, dataset: dict, run_dir: Path, checkpoint: Path | None
     """Run bounded independent-parent/query audits; return and save JSON summary."""
     from .inverse import inverse_tracking
     from .runtime import atomic_write_json, confined_path, content_hash, memory_record
+    from .tower_reporting import emit_event
     started = time.perf_counter()
     run_dir = confined_path(run_dir)
     run_dir.mkdir(parents=True, exist_ok=True)
@@ -415,7 +421,7 @@ def evaluate(config: dict, dataset: dict, run_dir: Path, checkpoint: Path | None
     parents, timings, consistency, bl_records, unresolved = [], [], [], [], []
     lp_done = set()
     with paths["query_errors.jsonl"].open("x") as raw, paths["representation.jsonl"].open("x") as representations:
-        for record in selected:
+        for completed, record in enumerate(selected, 1):
             per_method = {}
             for observation_time in record["times"]:
                 parent = ParentInput(record["parent_id"], record["family"], tuple(record["parameters"]), observation_time, domain)
@@ -627,6 +633,10 @@ def evaluate(config: dict, dataset: dict, run_dir: Path, checkpoint: Path | None
                                         "scaling_max_error": scaling, "zero_direction_max_error": zero,
                                         "status": "numerical_grid_state_tangent_consistency_diagnostic",
                                         "associated_state": "learned_grid_state_autodiff", "integrability_claim": False})
+            if os.environ.get("SSMO_TOWER_ACTIVE_COMMAND") == "evaluate":
+                emit_event("evaluate", {"evaluation_completed_physical_parents": completed,
+                                        "evaluation_unresolved_rows": len(unresolved)},
+                           step=completed, completed=completed, total=len(selected), unit="physical parents")
     parent_path = paths["evaluation_parents.jsonl"]
     with parent_path.open("x") as stream:
         for row in parents:

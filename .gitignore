@@ -2,6 +2,8 @@
 .cache/
 local/
 runs/
+reports/
+.tower/passports/
 datasets/
 *.egg-info/
 build/

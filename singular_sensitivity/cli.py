@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import argparse
 import copy
+from contextlib import ExitStack, redirect_stderr, redirect_stdout
 import io
 import json
 import os
@@ -23,6 +24,7 @@ def _parser() -> argparse.ArgumentParser:
         sub.add_argument("--config", default="configs/smoke.yaml")
         if command != "plan":
             sub.add_argument("--run-dir", required=True)
+            sub.add_argument("--tower-attempt-dir", help="Fresh project-contained Tower reporting directory for a local attempt")
         if command in {"train", "evaluate"}:
             sub.add_argument("--manifest", required=True)
         if command == "train":
@@ -48,7 +50,18 @@ def _audit(run_dir: Path) -> dict:
     if suite.countTestCases() == 0:
         raise RuntimeError("A zero-test audit does not validate the workflow")
     stream = io.StringIO()
-    result = unittest.TextTestRunner(stream=stream, verbosity=2).run(suite)
+    # Test workloads have their own reporting identities. They are not live
+    # progress or scientific observations of the enclosing validation job.
+    context = {key: os.environ.pop(key, None) for key in
+               ("SSMO_TOWER_RUN_DIR", "SSMO_TOWER_ACTIVE_COMMAND")}
+    try:
+        result = unittest.TextTestRunner(stream=stream, verbosity=2).run(suite)
+    finally:
+        for key, value in context.items():
+            if value is not None:
+                os.environ[key] = value
+            else:
+                os.environ.pop(key, None)
     (run_dir / "tests.log").write_text(stream.getvalue())
     summary = {"tests_executed": result.testsRun, "failures": len(result.failures),
                "errors": len(result.errors), "skipped": len(result.skipped),
@@ -74,7 +87,7 @@ def _plan(config: dict) -> dict:
 def _report(run_dir: Path, artifact_source: str | Path | None = None) -> dict:
     run_dir = confined_path(run_dir)
     sources = []
-    excluded = {"source", ".cache", ".venv", ".git", "local", "__pycache__"}
+    excluded = {"source", ".cache", ".venv", ".git", "local", "__pycache__", "tower"}
     if artifact_source is not None:
         source = confined_path(artifact_source)
         if not source.is_dir():
@@ -118,6 +131,50 @@ def _report(run_dir: Path, artifact_source: str | Path | None = None) -> dict:
     return report
 
 
+class _LogTee:
+    """Retain local application output while respecting the caller's streams."""
+    def __init__(self, original, log):
+        self.original, self.log = original, log
+
+    def write(self, value):
+        self.log.write(value)
+        self.log.flush()
+        return self.original.write(value)
+
+    def flush(self):
+        self.log.flush()
+        self.original.flush()
+
+    def __getattr__(self, name):
+        return getattr(self.original, name)
+
+
+def _application_report(args, run_dir):
+    """Use this stage's reporter, or a fresh local attempt for an independent CLI."""
+    from . import tower_reporting as tower
+    inherited = os.environ.get("SSMO_TOWER_RUN_DIR")
+    if inherited and not args.tower_attempt_dir:
+        target = tower._attempt(inherited)
+        manifest = tower._read(target / "run.json")
+        metadata = manifest.get("metadata", {})
+        scope = metadata.get("application_artifact_directory")
+        if scope is None and metadata.get("pipeline_directory"):
+            scope = metadata["pipeline_directory"] + "/artifacts"
+        # An allocated audit invokes nested CLI fixture tests. Their artifacts
+        # belong to those tests, not to the surrounding validation job.
+        if scope and run_dir.is_relative_to(project_root() / scope):
+            return target, False
+    target = confined_path(args.tower_attempt_dir) if args.tower_attempt_dir else (
+        run_dir / "tower" / f"ssmo-{args.command}-{time.time_ns()}")
+    tower.start_attempt(target, stage=args.command, method=getattr(args, "method", None) or "reference",
+                        seed=getattr(args, "seed", None), config_path=args.config,
+                        source_dir=Path(__file__).resolve().parents[1], job_id="",
+                        metadata={"application_artifact_directory": run_dir.relative_to(project_root()).as_posix(),
+                                  "execution_entrypoint": "singular_sensitivity/cli.py",
+                                  "launch_scope": "local CLI application; allocation remains unknown unless recorded"})
+    return target, True
+
+
 def main(argv=None) -> int:
     args = _parser().parse_args(argv)
     # Establish storage before importing NumPy/PyTorch or executing any workload.
@@ -135,8 +192,23 @@ def main(argv=None) -> int:
         print("Stage artifacts already exist; select a fresh run directory to preserve earlier results", file=sys.stderr)
         return 2
     started = time.monotonic()
+    cpu_started = time.process_time()
     dataset = None
+    tower_dir, tower_owned = None, False
+    inherited_tower = os.environ.get("SSMO_TOWER_RUN_DIR")
+    inherited_command = os.environ.get("SSMO_TOWER_ACTIVE_COMMAND")
+    output_capture = ExitStack()
     try:
+        from . import tower_reporting as tower
+        tower_dir, tower_owned = _application_report(args, run_dir)
+        os.environ["SSMO_TOWER_RUN_DIR"] = str(tower_dir)
+        os.environ["SSMO_TOWER_ACTIVE_COMMAND"] = args.command
+        if tower_owned:
+            stdout_log = output_capture.enter_context((tower_dir / "logs/application.stdout.log").open("a", buffering=1))
+            stderr_log = output_capture.enter_context((tower_dir / "logs/application.stderr.log").open("a", buffering=1))
+            output_capture.enter_context(redirect_stdout(_LogTee(sys.stdout, stdout_log)))
+            output_capture.enter_context(redirect_stderr(_LogTee(sys.stderr, stderr_log)))
+        tower.emit_event(args.command, {})
         if args.command in {"train", "evaluate"}:
             from .data import load_manifest
             dataset = load_manifest(args.manifest)
@@ -207,11 +279,17 @@ def main(argv=None) -> int:
             raise AssertionError("Unhandled stage")
         record = provenance(config, dataset)
         record.update(command=args.command, elapsed_seconds=time.monotonic() - started,
+                      process_cpu_seconds=time.process_time() - cpu_started,
                       task_threads=threads,
                       memory=memory_record(device if args.command in {"train", "evaluate", "gpu-audit", "inverse"} else "cpu"))
         atomic_write_json(run_dir / "provenance.json", record)
         print(json.dumps(result, indent=2, allow_nan=False))
-        return 75 if result.get("status") == "paused" else 1 if result.get("status") == "failed" else 0
+        exit_code = 75 if result.get("status") == "paused" else 1 if result.get("status") == "failed" else 0
+        tower.report_phase(args.command, result, run_dir, config, dataset,
+                           record["elapsed_seconds"], record, attempt_dir=tower_dir)
+        if tower_owned:
+            tower.finish_attempt(tower_dir, exit_code)
+        return exit_code
     except Exception as error:
         failure_file = run_dir / "failure.json"
         if failure_file.exists():
@@ -220,7 +298,27 @@ def main(argv=None) -> int:
                           "error_type": type(error).__name__, "reason": str(error),
                           "elapsed_seconds": time.monotonic() - started, "provenance": provenance(config, dataset)})
         print(f"{type(error).__name__}: {error}", file=sys.stderr)
+        if tower_dir is not None:
+            try:
+                tower.report_phase(args.command, {"status": "failed", "error_type": type(error).__name__,
+                                   "reason": str(error)}, run_dir, config, dataset,
+                                   time.monotonic() - started, attempt_dir=tower_dir)
+                if tower_owned:
+                    tower.finish_attempt(tower_dir, 1)
+            except Exception as reporting_error:
+                # Keep the original failure and partial reporting evidence.
+                print(f"Tower reporting incomplete: {reporting_error}", file=sys.stderr)
         return 1
+    finally:
+        output_capture.close()
+        if inherited_tower is None:
+            os.environ.pop("SSMO_TOWER_RUN_DIR", None)
+        else:
+            os.environ["SSMO_TOWER_RUN_DIR"] = inherited_tower
+        if inherited_command is None:
+            os.environ.pop("SSMO_TOWER_ACTIVE_COMMAND", None)
+        else:
+            os.environ["SSMO_TOWER_ACTIVE_COMMAND"] = inherited_command
 
 
 if __name__ == "__main__":

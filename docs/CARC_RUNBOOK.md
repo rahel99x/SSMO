@@ -12,10 +12,111 @@ inspection, editing, discovery, submission and monitoring. The Bash frontend
 runs installation and computational stages through Slurm and `srun`.
 
 The user's three-seed pilot, signed diagnostic and cost review are complete.
-The current next step is [closeout](#close-the-completed-single-front-pilot);
-retain the evidence and frozen settings. Earlier sections document how those
+The current next step is [Tower export](#view-completed-evidence-in-tower);
+retain the evidence and frozen settings. [Closeout](#close-the-completed-single-front-pilot)
+remains available if its small evidence bundle has not yet been made. Earlier sections document how those
 stages were run. Further GPU runs for this pilot are not justified by its
 reported error/cost results.
+
+## View completed evidence in Tower
+
+These steps read completed artifacts with the existing Python venv and standard
+library. They submit no jobs, load no models and leave Tower and original runs
+unchanged. Use the Tower installation already available in your shell.
+
+```bash
+cd /home1/aadaniel/projects/SSMO
+git pull --ff-only
+export SSMO_PROJECT_ROOT="$PWD"
+unset SSMO_ROOT
+module load python/3.12.8
+bash scripts/tower.sh --help
+command -v tower
+
+SSMO_TOWER_EXPORT="runs/ssmo-tower-completed-001"
+bash scripts/tower.sh import \
+  --run ssmo-pilot-001 \
+  --run ssmo-pilot-seed29 \
+  --run ssmo-pilot-seed43 \
+  --artifact-dir runs/ssmo-pilot-review-20261004T000302Z-2641811 \
+  --artifact-dir runs/ssmo-pilot-diagnostics-20261004T003557Z-2892611 \
+  --artifact-dir runs/ssmo-pilot-cost-review-001 \
+  --output-dir "$SSMO_TOWER_EXPORT" \
+  --accounting
+```
+
+Expected: a fresh export with one attempt per recorded job plus three review
+attempts, an `index.json`, a small input-checksum `sources.json`, and captured
+accounting stdout/stderr. `--accounting` makes one `sacct` request with a
+30-second timeout; it is optional. Omit it if historical accounting is
+unavailable. Without accounting, original application evidence determines
+known outcomes and missing scheduler/resource facts remain unknown. Existing
+destinations are refused; retain partial failures and choose another suffix.
+No raw JSONL is copied or expanded, and original checkpoints/source stay intact.
+
+Build planning history from only this export and choose its first evaluation
+attempt explicitly from the index:
+
+```bash
+bash scripts/tower.sh planning \
+  --export-dir "$SSMO_TOWER_EXPORT" \
+  --output reports/planning.json
+bash scripts/tower.sh list --export-dir "$SSMO_TOWER_EXPORT"
+
+SSMO_TOWER_ATTEMPT="$SSMO_PROJECT_ROOT/$(
+  .venv/bin/python -B -S - "$SSMO_TOWER_EXPORT/index.json" <<'PY'
+import json
+import sys
+from pathlib import Path
+index = json.loads(Path(sys.argv[1]).read_text())
+print(next(row["path"] for row in index["attempts"] if row["stage"] == "evaluate"))
+PY
+)"
+bash scripts/tower.sh validate --attempt-dir "$SSMO_TOWER_ATTEMPT"
+bash scripts/tower.sh launch \
+  --attempt-dir "$SSMO_TOWER_ATTEMPT" \
+  --planning-file reports/planning.json
+```
+
+Expected: native Tower contract validation succeeds, and the Experiment view
+shows the selected attempt's imported observations and scientific results.
+The native Log view uses exact grouped scheduler, application, training and
+science paths when its selected job matches the inventory's actual `job_id`.
+Imported attempts do not reconstruct separate application captures; original
+terminal output remains in the indexed scheduler logs. Historical observations are labeled `imported_summary` at
+export time: they are not reconstructed live curves or historical ETAs. The
+three-seed review preserves per-seed accuracy and paired cost ratios. A file
+contract pass is operational evidence; the pilot's complete weak gate still
+fails. Three seeds do not justify calibrated resource predictions or scaling
+claims. If `reports/planning.json` already exists, choose another contained
+filename and pass that filename to `launch`; deliberate replacement requires
+`planning --replace`.
+
+Share the import/planning counts, the native validation result and any missing
+log warning. A schema check in the cloud does not establish this native CARC
+check. If `tower` is absent from PATH, activate your existing installation and
+repeat only `validate`/`launch`; no SSMO dependency installation is needed.
+
+For a future authorized new pipeline, reporting is automatic. Its concrete
+attempts live in `runs/<run-id>/tower/`; pass the chosen absolute directory to
+`validate`/`launch`. Each sbatch job uses that writable directory as its WorkDir,
+with an explicit one-node/one-task allocation and read-only source snapshot.
+Scheduler stdout/stderr stay in `runs/<run-id>/logs/`; actual task stdout/stderr
+are separate files inside the attempt. Training metrics report measured losses,
+validation, timing and memory; evaluation/representation report physical-parent
+progress. Optional native GPU CSV traces sample one verified allocated physical
+GPU at 60 seconds. Set `SSMO_TOWER_GPU_TRACE=0` before a future submission to
+disable them. Unsupported selectors or unknown node counts skip sampling with
+a recorded reason; no extra scheduler steps are started to poll utilization.
+An exit-75 pause stays interrupted, and forced kills can leave incomplete
+reports until actual scheduler evidence is imported into a fresh export.
+
+Do not resume/evaluate old pre-integration source snapshots using a changed
+checkout: existing source-recovery guards intentionally refuse that mismatch.
+The import path above reads their completed evidence without changing frozen
+scientific bytes. Read [TOWER_FORMATS.md](TOWER_FORMATS.md) for paths, limits,
+measurement scopes, contract/schema provenance and the absence of unmeasured
+workflow/scaling recipes.
 
 ## 1. Get the current code
 
@@ -442,6 +543,7 @@ artifacts.
 | Source/config/software provenance | `source/`, `config.yaml`, hashes, `artifacts/dependency-freeze.txt` |
 | Scheduler IDs and recovery settings | `jobs.tsv`, `submission-manifest.txt` |
 | Raw stdout/stderr and submission errors | `logs/` |
+| Per-job Tower inventory, log index, metrics, final summary and compact analytics | `tower/<attempt>/` |
 | Immutable physical-parent manifest | `artifacts/data/parents.json` |
 | Measure training and selected/latest checkpoints | `artifacts/train-measure-seed17/` |
 | State-only pilot control | `artifacts/train-state_only-seed17/` |

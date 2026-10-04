@@ -1,0 +1,68 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Tower application metric record v1",
+  "description": "One UTF-8 JSON object per newline in metrics.jsonl. This is the native Tower MetricReader input, with a stricter no-extra-fields producer profile. No schema marker is emitted in individual metric records.",
+  "type": "object",
+  "required": [
+    "t"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "t": {
+      "type": "number",
+      "minimum": 0,
+      "description": "Finite, nonnegative Unix epoch seconds in UTC."
+    },
+    "metrics": {
+      "type": "object",
+      "maxProperties": 64,
+      "propertyNames": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 96,
+        "pattern": "^[^\\u0000-\\u001f\\u007f-\\u009f]*$"
+      },
+      "additionalProperties": {
+        "type": "number"
+      },
+      "description": "Finite numeric application measurements. Names include units where useful, for example loss, throughput_items_per_s, accuracy_fraction."
+    },
+    "step": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 9223372036854775807
+    },
+    "phase": {
+      "type": "string",
+      "minLength": 0,
+      "maxLength": 160,
+      "pattern": "^[^\\u0000-\\u001f\\u007f-\\u009f]*$"
+    },
+    "progress": {
+      "type": "object",
+      "required": [
+        "completed",
+        "total"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "completed": {
+          "type": "number",
+          "minimum": 0
+        },
+        "total": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "unit": {
+          "type": "string",
+          "minLength": 0,
+          "maxLength": 64,
+          "pattern": "^[^\\u0000-\\u001f\\u007f-\\u009f]*$"
+        }
+      },
+      "description": "Native validation also enforces completed <= total. JSON Schema does not compare these sibling values."
+    }
+  },
+  "$comment": "Reject duplicate JSON keys, nonfinite numbers, invalid UTF-8, and records over 65536 bytes before schema validation. Native validation checks Python str.isprintable(), a stricter Unicode rule than this schema's control-character pattern. The default reader retains a bounded recent sample, not the full history."
+}

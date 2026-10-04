@@ -1,0 +1,622 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Tower portable run summary v1",
+  "description": "One flat project-owned JSON object per run. Append these objects to reports/planning.json.history for native prediction/forecast/tradeoff analysis, and to .scaling when scaling metadata is explicit. A summary.json file alone is not auto-discovered by Tower.",
+  "type": "object",
+  "required": [
+    "schema",
+    "id",
+    "name",
+    "state"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "schema": {
+      "const": "tower.summary/v1"
+    },
+    "id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$",
+      "description": "Unique immutable run/attempt identifier. Repeat exports keep this ID; do not use one ID for multiple attempts."
+    },
+    "name": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^[^\\u0000-\\u001f\\u007f-\\u009f]*$",
+      "description": "Stable workload/cohort name, shared by comparable runs. A run ID or timestamp is not a workload name. For native tradeoff portability keep this to at most 128 UTF-8 bytes."
+    },
+    "state": {
+      "enum": [
+        "CREATED",
+        "SUBMITTED",
+        "PENDING",
+        "RUNNING",
+        "COMPLETING",
+        "COMPLETED",
+        "FAILED",
+        "CANCELLED",
+        "TIMEOUT",
+        "OUT_OF_MEMORY",
+        "NODE_FAIL",
+        "PREEMPTED",
+        "BOOT_FAIL",
+        "DEADLINE",
+        "REQUEUED",
+        "REQUEUE_FED",
+        "REQUEUE_HOLD",
+        "RESIZING",
+        "REVOKED",
+        "SIGNALING",
+        "SPECIAL_EXIT",
+        "STAGE_OUT",
+        "STOPPED",
+        "SUSPENDED",
+        "UNKNOWN",
+        "INTERRUPTED"
+      ]
+    },
+    "partition": {
+      "anyOf": [
+        {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[^\\u0000-\\u001f\\u007f-\\u009f]*$"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "account": {
+      "anyOf": [
+        {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[^\\u0000-\\u001f\\u007f-\\u009f]*$"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "qos": {
+      "anyOf": [
+        {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[^\\u0000-\\u001f\\u007f-\\u009f]*$"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "cpus": {
+      "anyOf": [
+        {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 1000000000,
+          "description": "Recorded total CPU allocation across the entire job, not CPUs per task or node."
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "nodes": {
+      "anyOf": [
+        {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 1000000000
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "gpus": {
+      "anyOf": [
+        {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1000000000,
+          "description": "Recorded total GPU allocation. Zero means positively known zero; omit/null means unknown."
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "gpu_type": {
+      "anyOf": [
+        {
+          "type": "string",
+          "minLength": 0,
+          "maxLength": 128,
+          "pattern": "^[^\\u0000-\\u001f\\u007f-\\u009f]*$",
+          "description": "Requested/allocated GPU model. The empty string means explicitly known generic GPU allocation; null/omission means unknown."
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "mem_bytes": {
+      "anyOf": [
+        {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 9223372036854775807,
+          "description": "Requested allocation-wide memory total in bytes, not an observed peak. Resolve Slurm per-CPU/per-node units explicitly before reporting."
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "time_seconds": {
+      "anyOf": [
+        {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 3162240000,
+          "exclusiveMinimum": 0,
+          "description": "Requested job walltime limit in seconds, distinct from runtime_seconds."
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "runtime_seconds": {
+      "anyOf": [
+        {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1e+100,
+          "description": "Observed job/workload wall-clock duration in seconds; do not substitute the requested time limit. Incomplete TIMEOUT/OOM observations remain censored."
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "memory_bytes": {
+      "anyOf": [
+        {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1e+100,
+          "description": "Observed memory peak in bytes with an explicit memory_scope. Unknown peaks remain null/omitted; Slurm MaxRSS is maximum task RSS, not total job memory."
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "memory_scope": {
+      "anyOf": [
+        {
+          "enum": [
+            "job_peak",
+            "per_node_peak",
+            "max_task_rss"
+          ]
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "cpu_seconds": {
+      "anyOf": [
+        {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1e+100,
+          "description": "Measured aggregate CPU seconds with source/scope in metadata. Python process_time excludes child processes and is not an allocation-wide measure unless that scope matches the workload."
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "script_sha256": {
+      "anyOf": [
+        {
+          "type": "string",
+          "pattern": "^[0-9a-fA-F]{64}$"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "parameters": {
+      "type": "object",
+      "maxProperties": 64,
+      "propertyNames": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 64,
+        "pattern": "^[^\\u0000-\\u001f\\u007f-\\u009f]*$"
+      },
+      "additionalProperties": {
+        "$ref": "#/$defs/parameter1"
+      },
+      "description": "Stable scientific workload identity, excluding repeat IDs, run IDs, paths, timestamps, and resource requests. At most four nesting levels and 128 total JSON values; Tower additionally enforces the total-value budget."
+    },
+    "input_size": {
+      "anyOf": [
+        {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1e+100
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "start": {
+      "anyOf": [
+        {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 253402300799,
+          "description": "Unix epoch seconds in UTC. Omit or use null when unknown; never local time strings."
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "end": {
+      "anyOf": [
+        {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 253402300799,
+          "description": "Unix epoch seconds in UTC. Omit or use null when unknown; never local time strings."
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "submit": {
+      "anyOf": [
+        {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 253402300799,
+          "description": "Unix epoch seconds in UTC. Omit or use null when unknown; never local time strings."
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "job_id": {
+      "anyOf": [
+        {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[^\\u0000-\\u001f\\u007f-\\u009f]*$"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "experiment_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^[^\\u0000-\\u001f\\u007f-\\u009f]*$"
+    },
+    "attempt": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 2147483647
+    },
+    "project_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"
+    },
+    "exit_code": {
+      "anyOf": [
+        {
+          "type": "integer",
+          "minimum": -2147483648,
+          "maximum": 2147483647
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "workers": {
+      "anyOf": [
+        {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 1000000
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "problem_size": {
+      "anyOf": [
+        {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1e+300,
+          "exclusiveMinimum": 0
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "repeat": {
+      "anyOf": [
+        {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 10000
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "fingerprint": {
+      "anyOf": [
+        {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256,
+          "pattern": "^[^\\u0000-\\u001f\\u007f-\\u009f]*$"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "work_units": {
+      "anyOf": [
+        {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1e+300,
+          "exclusiveMinimum": 0
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "results": {
+      "type": "object",
+      "description": "Scientific outputs, with measurement names and units documented by the project. Tower's native prediction/scaling readers do not interpret this object."
+    },
+    "metadata": {
+      "type": "object",
+      "description": "Optional measurement provenance and descriptive metadata; never embed credentials or secrets."
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "required": ["state"],
+        "properties": {"state": {"const": "COMPLETED"}}
+      },
+      "then": {
+        "properties": {"exit_code": {"enum": [0, null]}}
+      }
+    },
+    {
+      "if": {
+        "required": [
+          "memory_bytes"
+        ],
+        "properties": {
+          "memory_bytes": {
+            "type": "number"
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "memory_scope"
+        ],
+        "properties": {
+          "memory_scope": {
+            "enum": [
+              "job_peak",
+              "per_node_peak",
+              "max_task_rss"
+            ]
+          }
+        }
+      }
+    }
+  ],
+  "$defs": {
+    "parameter1": {
+      "anyOf": [
+        {
+          "type": "null"
+        },
+        {
+          "type": "boolean"
+        },
+        {
+          "type": "string",
+          "minLength": 0,
+          "maxLength": 256,
+          "pattern": "^[^\\u0000-\\u001f\\u007f-\\u009f]*$"
+        },
+        {
+          "type": "number",
+          "minimum": -1e+100,
+          "maximum": 1e+100
+        },
+        {
+          "type": "object",
+          "maxProperties": 64,
+          "propertyNames": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 64,
+            "pattern": "^[^\\u0000-\\u001f\\u007f-\\u009f]*$"
+          },
+          "additionalProperties": {
+            "$ref": "#/$defs/parameter2"
+          }
+        },
+        {
+          "type": "array",
+          "maxItems": 64,
+          "items": {
+            "$ref": "#/$defs/parameter2"
+          }
+        }
+      ]
+    },
+    "parameter2": {
+      "anyOf": [
+        {
+          "type": "null"
+        },
+        {
+          "type": "boolean"
+        },
+        {
+          "type": "string",
+          "minLength": 0,
+          "maxLength": 256,
+          "pattern": "^[^\\u0000-\\u001f\\u007f-\\u009f]*$"
+        },
+        {
+          "type": "number",
+          "minimum": -1e+100,
+          "maximum": 1e+100
+        },
+        {
+          "type": "object",
+          "maxProperties": 64,
+          "propertyNames": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 64,
+            "pattern": "^[^\\u0000-\\u001f\\u007f-\\u009f]*$"
+          },
+          "additionalProperties": {
+            "$ref": "#/$defs/parameter3"
+          }
+        },
+        {
+          "type": "array",
+          "maxItems": 64,
+          "items": {
+            "$ref": "#/$defs/parameter3"
+          }
+        }
+      ]
+    },
+    "parameter3": {
+      "anyOf": [
+        {
+          "type": "null"
+        },
+        {
+          "type": "boolean"
+        },
+        {
+          "type": "string",
+          "minLength": 0,
+          "maxLength": 256,
+          "pattern": "^[^\\u0000-\\u001f\\u007f-\\u009f]*$"
+        },
+        {
+          "type": "number",
+          "minimum": -1e+100,
+          "maximum": 1e+100
+        },
+        {
+          "type": "object",
+          "maxProperties": 64,
+          "propertyNames": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 64,
+            "pattern": "^[^\\u0000-\\u001f\\u007f-\\u009f]*$"
+          },
+          "additionalProperties": {
+            "$ref": "#/$defs/parameter4"
+          }
+        },
+        {
+          "type": "array",
+          "maxItems": 64,
+          "items": {
+            "$ref": "#/$defs/parameter4"
+          }
+        }
+      ]
+    },
+    "parameter4": {
+      "anyOf": [
+        {
+          "type": "null"
+        },
+        {
+          "type": "boolean"
+        },
+        {
+          "type": "string",
+          "minLength": 0,
+          "maxLength": 256,
+          "pattern": "^[^\\u0000-\\u001f\\u007f-\\u009f]*$"
+        },
+        {
+          "type": "number",
+          "minimum": -1e+100,
+          "maximum": 1e+100
+        },
+        {
+          "type": "object",
+          "maxProperties": 0,
+          "propertyNames": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 64,
+            "pattern": "^[^\\u0000-\\u001f\\u007f-\\u009f]*$"
+          },
+          "additionalProperties": false
+        },
+        {
+          "type": "array",
+          "maxItems": 0,
+          "items": false
+        }
+      ]
+    }
+  },
+  "$comment": "Fields may be omitted/null when unknown; missing concrete allocation/cohort evidence makes the native models abstain. id is the application run identity, job_id is the scheduler job/episode identity. Predict deduplicates id; scaling deduplicates job_id or (workers,repeat), so one must identify independent repeats. Native conditional constraints and aggregate parameter/read budgets remain authoritative."
+}

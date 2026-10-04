@@ -1,0 +1,31 @@
+{
+  "profiles": {
+    "carc": {
+      "account": "anakano_81",
+      "gpu_sampling": false,
+      "weather": false,
+      "budget": false,
+      "intervals": {
+        "jobs": 10,
+        "starts": 60,
+        "live": 30,
+        "nodes": 60,
+        "partitions": 120,
+        "finished": 120,
+        "share": 300,
+        "account": 120,
+        "details": 60,
+        "trace": 120
+      }
+    }
+  },
+  "logs": {
+    "manifest_file": "logs.json"
+  },
+  "research": {
+    "metrics_file": "metrics.jsonl",
+    "contract": ".tower/contracts/outputs.v1.json",
+    "planning_file": "reports/planning.json",
+    "interval": 5
+  }
+}

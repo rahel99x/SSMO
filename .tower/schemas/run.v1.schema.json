@@ -1,0 +1,208 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Tower project-owned run manifest v1",
+  "description": "Descriptive project metadata. Tower 2.3 does not discover or parse this manifest automatically; bind its explicit paths through Tower's existing flags or commands.",
+  "type": "object",
+  "required": [
+    "schema",
+    "run_id",
+    "experiment_id",
+    "attempt",
+    "state"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "schema": {
+      "const": "tower.run/v1"
+    },
+    "project_id": {
+      "$ref": "summary.v1.schema.json#/properties/project_id"
+    },
+    "run_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"
+    },
+    "experiment_id": {
+      "$ref": "summary.v1.schema.json#/properties/experiment_id"
+    },
+    "attempt": {
+      "$ref": "summary.v1.schema.json#/properties/attempt"
+    },
+    "name": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^[^\\u0000-\\u001f\\u007f-\\u009f]*$"
+    },
+    "state": {
+      "$ref": "summary.v1.schema.json#/properties/state"
+    },
+    "job_id": {
+      "$ref": "summary.v1.schema.json#/properties/job_id"
+    },
+    "start": {
+      "$ref": "summary.v1.schema.json#/properties/start"
+    },
+    "end": {
+      "$ref": "summary.v1.schema.json#/properties/end"
+    },
+    "submit": {
+      "$ref": "summary.v1.schema.json#/properties/submit"
+    },
+    "paths": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "metrics": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 4096,
+          "pattern": "^(?!/)(?!.*(?:^|/)\\.{1,2}(?:/|$))(?!.*[\\\\*?\\[\\]\\u0000-\\u001f\\u007f])[^/]+(?:/[^/]+)*$",
+          "description": "Exact relative POSIX path: no absolute path, empty/. /.. segment, backslash, glob, or control character."
+        },
+        "summary": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 4096,
+          "pattern": "^(?!/)(?!.*(?:^|/)\\.{1,2}(?:/|$))(?!.*[\\\\*?\\[\\]\\u0000-\\u001f\\u007f])[^/]+(?:/[^/]+)*$",
+          "description": "Exact relative POSIX path: no absolute path, empty/. /.. segment, backslash, glob, or control character."
+        },
+        "outputs": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 4096,
+          "pattern": "^(?!/)(?!.*(?:^|/)\\.{1,2}(?:/|$))(?!.*[\\\\*?\\[\\]\\u0000-\\u001f\\u007f])[^/]+(?:/[^/]+)*$",
+          "description": "Exact relative POSIX path: no absolute path, empty/. /.. segment, backslash, glob, or control character."
+        },
+        "logs": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 4096,
+          "pattern": "^(?!/)(?!.*(?:^|/)\\.{1,2}(?:/|$))(?!.*[\\\\*?\\[\\]\\u0000-\\u001f\\u007f])[^/]+(?:/[^/]+)*$",
+          "description": "Exact relative POSIX path: no absolute path, empty/. /.. segment, backslash, glob, or control character."
+        },
+        "passports": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 4096,
+          "pattern": "^(?!/)(?!.*(?:^|/)\\.{1,2}(?:/|$))(?!.*[\\\\*?\\[\\]\\u0000-\\u001f\\u007f])[^/]+(?:/[^/]+)*$",
+          "description": "Exact relative POSIX path: no absolute path, empty/. /.. segment, backslash, glob, or control character."
+        },
+        "stdout": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 4096,
+          "pattern": "^(?!/)(?!.*(?:^|/)\\.{1,2}(?:/|$))(?!.*[\\\\*?\\[\\]\\u0000-\\u001f\\u007f])[^/]+(?:/[^/]+)*$"
+        },
+        "stderr": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 4096,
+          "pattern": "^(?!/)(?!.*(?:^|/)\\.{1,2}(?:/|$))(?!.*[\\\\*?\\[\\]\\u0000-\\u001f\\u007f])[^/]+(?:/[^/]+)*$"
+        },
+        "log_index": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 4096,
+          "pattern": "^(?!/)(?!.*(?:^|/)\\.{1,2}(?:/|$))(?!.*[\\\\*?\\[\\]\\u0000-\\u001f\\u007f])[^/]+(?:/[^/]+)*$",
+          "description": "Exact relative log index path, normally logs.json. Tower reads its tower.logs/v1 entries when logs.manifest_file is explicitly bound; it does not follow run.json paths automatically."
+        }
+      },
+      "description": "All paths resolve relative to this run directory. Defaults in the guide are metrics.jsonl, summary.json, logs.json (log_index), outputs, logs, passports. No recursive or glob discovery is implied."
+    },
+    "provenance": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "script": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 4096,
+          "pattern": "^(?!/)(?!.*(?:^|/)\\.{1,2}(?:/|$))(?!.*[\\\\*?\\[\\]\\u0000-\\u001f\\u007f])[^/]+(?:/[^/]+)*$",
+          "description": "Exact relative POSIX path: no absolute path, empty/. /.. segment, backslash, glob, or control character."
+        },
+        "script_sha256": {
+          "allOf": [
+            {
+              "$ref": "summary.v1.schema.json#/properties/script_sha256"
+            },
+            {
+              "not": {
+                "type": "null"
+              }
+            }
+          ]
+        },
+        "git_commit": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^[0-9a-fA-F]{40,64}$"
+        },
+        "description": {
+          "type": "string",
+          "minLength": 0,
+          "maxLength": 4096,
+          "pattern": "^[^\\u0000-\\u001f\\u007f-\\u009f]*$"
+        }
+      },
+      "description": "The script path resolves relative to the project root; the digest identifies the actual script bytes used for this run."
+    },
+    "parameters": {
+      "$ref": "summary.v1.schema.json#/properties/parameters"
+    },
+    "results": {
+      "type": "object"
+    },
+    "metadata": {
+      "type": "object"
+    },
+    "description": {
+      "type": "string",
+      "minLength": 0,
+      "maxLength": 4096,
+      "pattern": "^[^\\u0000-\\u001f\\u007f-\\u009f]*$"
+    },
+    "resources": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "partition": {
+          "$ref": "summary.v1.schema.json#/properties/partition"
+        },
+        "cpus": {
+          "$ref": "summary.v1.schema.json#/properties/cpus"
+        },
+        "nodes": {
+          "$ref": "summary.v1.schema.json#/properties/nodes"
+        },
+        "gpus": {
+          "$ref": "summary.v1.schema.json#/properties/gpus"
+        },
+        "gpu_type": {
+          "$ref": "summary.v1.schema.json#/properties/gpu_type"
+        },
+        "account": {
+          "$ref": "summary.v1.schema.json#/properties/account"
+        },
+        "qos": {
+          "$ref": "summary.v1.schema.json#/properties/qos"
+        },
+        "mem_bytes": {
+          "$ref": "summary.v1.schema.json#/properties/mem_bytes"
+        },
+        "time_seconds": {
+          "$ref": "summary.v1.schema.json#/properties/time_seconds"
+        }
+      },
+      "description": "Known job allocation/request metadata, copied into the flat summary. Omit/null unknown quantities instead of inferring them from host CPU count or worker count."
+    },
+    "input_size": {
+      "$ref": "summary.v1.schema.json#/properties/input_size"
+    }
+  },
+  "$comment": "State changes update this application-owned manifest atomically; preserve separate directories for each retry/attempt. Native Tower passports have their own schema and should be captured through Tower, not fabricated from this manifest."
+}

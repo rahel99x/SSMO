@@ -1,0 +1,154 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Tower native output contract v1",
+  "description": "Native declarative artifact contract. Contract paths resolve relative to the explicit --workdir/artifacts root, normally the selected run directory. No shell commands, recursive scans, globs, or interpolation.",
+  "type": "object",
+  "required": [
+    "version",
+    "outputs"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "version": {
+      "type": "integer",
+      "const": 1
+    },
+    "outputs": {
+      "type": "array",
+      "maxItems": 4096,
+      "items": {
+        "type": "object",
+        "required": [
+          "path"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "path": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 4096,
+            "pattern": "^(?!/)(?!.*(?:^|/)\\.{1,2}(?:/|$))(?!.*[\\\\*?\\[\\]\\u0000-\\u001f\\u007f])[^/]+(?:/[^/]+)*$",
+            "description": "Exact relative POSIX path: no absolute path, empty/. /.. segment, backslash, glob, or control character."
+          },
+          "required": {
+            "type": "boolean"
+          },
+          "min_bytes": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9223372036854775807
+          },
+          "max_bytes": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9223372036854775807
+          },
+          "format": {
+            "enum": [
+              "json",
+              "csv",
+              "text"
+            ]
+          },
+          "columns": {
+            "type": "array",
+            "maxItems": 256,
+            "uniqueItems": true,
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 1024,
+              "pattern": "^[^\\u0000-\\u001f\\u007f-\\u009f]*$"
+            }
+          },
+          "rows": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9223372036854775807
+          },
+          "min_rows": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9223372036854775807
+          },
+          "max_rows": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9223372036854775807
+          },
+          "required_keys": {
+            "type": "array",
+            "maxItems": 256,
+            "uniqueItems": true,
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 1024,
+              "pattern": "^[^\\u0000-\\u001f\\u007f-\\u009f]*$"
+            }
+          },
+          "sha256": {
+            "type": "string",
+            "pattern": "^[0-9a-fA-F]{64}$"
+          }
+        },
+        "allOf": [
+          {
+            "if": {
+              "anyOf": [
+                {
+                  "required": [
+                    "columns"
+                  ]
+                },
+                {
+                  "required": [
+                    "rows"
+                  ]
+                },
+                {
+                  "required": [
+                    "min_rows"
+                  ]
+                },
+                {
+                  "required": [
+                    "max_rows"
+                  ]
+                }
+              ]
+            },
+            "then": {
+              "required": [
+                "format"
+              ],
+              "properties": {
+                "format": {
+                  "const": "csv"
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "required": [
+                "required_keys"
+              ]
+            },
+            "then": {
+              "required": [
+                "format"
+              ],
+              "properties": {
+                "format": {
+                  "const": "json"
+                }
+              }
+            }
+          }
+        ]
+      }
+    }
+  },
+  "$comment": "Native validation additionally rejects duplicate output paths, min_bytes > max_bytes, min_rows > max_rows, conflicting exact row counts, duplicate JSON keys, nonfinite numbers, and files over the 256 KiB contract budget. Artifact validation has separate read/entry budgets and refuses unconfined/symlink paths; a structurally valid contract is not a successful output check."
+}

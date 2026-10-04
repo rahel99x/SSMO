@@ -117,6 +117,22 @@ the full weak gate fails and measured exact/classical endpoints are faster.
 Use `scripts/close_pilot.sh` to retain small evidence copies and checksums, with
 all original runs preserved; broader learned studies remain gated.
 
+SSMO now reports in the formats supplied for **Slurm-Tower 2.3.1**.
+Each new Slurm stage has its own writable `runs/<pipeline>/tower/<attempt>/`
+directory with `run.json`, grouped `logs.json`, live `metrics.jsonl`, final
+`summary.json` and compact `outputs/analytics.json`. Frozen scientific artifacts
+remain authoritative. Training metrics use existing validation/checkpoint
+boundaries or a two-second cadence; optional allocated-device GPU traces use
+60 seconds. Tower itself is unchanged and reporting adds no runtime dependency.
+
+Use `bash scripts/tower.sh import` for completed pilots and reviews, then
+`planning`, `list`, `validate` and `launch` with your existing Tower installation.
+The [next Tower runbook steps](docs/CARC_RUNBOOK.md#view-completed-evidence-in-tower)
+use the completed three-seed pilots without rerunning experiments. Imports
+preserve each actual job and initialization separately, keep unknown measurements
+unknown, and retain compressed raw evidence without expanding it. See
+[TOWER_FORMATS.md](docs/TOWER_FORMATS.md) for interchange and measurement scopes.
+
 Every allocation charges `anakano_81`; project storage is
 `/home1/aadaniel/projects/SSMO`. CPU stages use `main`; GPU stages use `gpu`.
 A100 40 GB, A40, A30, L40 and L40S are separate profiles. Only currently observed

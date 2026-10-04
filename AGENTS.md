@@ -55,6 +55,29 @@ components. Baseline fit time
 includes label generation/all controls. Inverse timing includes exact diagnostic
 gradients and trusted acceptance, so it is not autonomous learned speedup.
 
+Read docs/TOWER_FORMATS.md before changing reporting. The user's Tower 2.3.1
+application must remain unchanged; adapt SSMO only. Each actual Slurm stage gets
+one fresh writable Tower WorkDir with exact job identity, grouped log index,
+finite bounded numeric metrics, terminal summary and compact scientific results.
+Keep frozen source read-only and preserve original task exit/signal/checkpoint
+behavior. Existing scientific summaries/raw logs remain authoritative. Training
+reports reuse existing observations at validation/checkpoint boundaries or about
+every two seconds; GPU traces sample only one verified allocated physical device
+on one node every 60 seconds, with an explicit skip reason otherwise.
+Use scripts/tower.sh to import explicit completed runs/reviews into fresh
+contained exports and build explicitly selected planning history. It uses the
+venv and standard library; no Tower installation, checkpoint load, scientific
+execution, raw decompression, automatic job polling or submissions. Optional
+--accounting makes one bounded sacct query. Missing resources remain unknown;
+MaxRSS is max_task_rss, Torch reservation is separate, seed/parent/method/workload
+cohorts stay separate, and completed processes may fail scientific gates.
+Never invent historical metric epochs/progress, forecasts, scaling evidence or
+Tower passports. Validate the bundled schemas and actual emitted samples;
+native Tower validation requires the user's existing installation. Imports are
+the next runbook step for this completed pilot, without another GPU campaign.
+Pre-integration frozen runs remain historical evidence; source recovery guards
+must continue refusing changed implementations rather than rewriting snapshots.
+
 Retain signed atoms at continuous coordinates; never multiply an atom by cell
 width or normalize signed masses as probabilities. Nonlinear field objectives
 use payoff jumps and base traces. Chart JVPs must retain mixed weight/parameter

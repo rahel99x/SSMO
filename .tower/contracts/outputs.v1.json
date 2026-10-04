@@ -1,0 +1,44 @@
+{
+  "version": 1,
+  "outputs": [
+    {
+      "path": "run.json",
+      "required": true,
+      "format": "json",
+      "min_bytes": 1,
+      "max_bytes": 65536,
+      "required_keys": ["schema", "run_id", "experiment_id", "attempt", "state"]
+    },
+    {
+      "path": "logs.json",
+      "required": true,
+      "format": "json",
+      "min_bytes": 1,
+      "max_bytes": 262144,
+      "required_keys": ["schema", "logs"]
+    },
+    {
+      "path": "metrics.jsonl",
+      "required": true,
+      "format": "text",
+      "min_bytes": 1,
+      "max_bytes": 4194304
+    },
+    {
+      "path": "summary.json",
+      "required": false,
+      "format": "json",
+      "min_bytes": 1,
+      "max_bytes": 262144,
+      "required_keys": ["schema", "id", "name", "state"]
+    },
+    {
+      "path": "outputs/analytics.json",
+      "required": false,
+      "format": "json",
+      "min_bytes": 1,
+      "max_bytes": 262144,
+      "required_keys": ["results"]
+    }
+  ]
+}

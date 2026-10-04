@@ -1,0 +1,54 @@
+{
+  "application_version": "2.3.1",
+  "bundle_manifest_sha256": "3ab6ab311e81d664a31f4c1c528140e875c41538f9011d27aaa707ebd5307092",
+  "copied_files": [
+    {
+      "bytes": 1081,
+      "path": "LICENSE.upstream",
+      "sha256": "e87b3600fb81d34b1cffecc7347c9f435b132099c45e2485d48cecfc5ed0d98e",
+      "upstream_path": "LICENSE"
+    },
+    {
+      "bytes": 3069,
+      "path": "schemas/logs.v1.schema.json",
+      "sha256": "d0885127fd8f7306528266f36e7ad1cb2c85fbfddd0b81a2cec3d1121e3e6910",
+      "upstream_path": "docs/schemas/logs.v1.schema.json"
+    },
+    {
+      "bytes": 2274,
+      "path": "schemas/metrics.v1.schema.json",
+      "sha256": "efb97cff6a9526d26bf0f58deb31401f59fbdf15b228fe6ffac7f2bd02ea35b6",
+      "upstream_path": "docs/schemas/metrics.v1.schema.json"
+    },
+    {
+      "bytes": 4391,
+      "path": "schemas/output-contract.v1.schema.json",
+      "sha256": "33f8772aa541320239c9fb439c083511c047f636985c1886aeb8bc8c64fb5d76",
+      "upstream_path": "docs/schemas/output-contract.v1.schema.json"
+    },
+    {
+      "bytes": 41233,
+      "path": "schemas/planning.v1.schema.json",
+      "sha256": "6b8406fea322952422633aca2b3447fd286a7d4c5801f2e192640e62e09925a2",
+      "upstream_path": "docs/schemas/planning.v1.schema.json"
+    },
+    {
+      "bytes": 7605,
+      "path": "schemas/run.v1.schema.json",
+      "sha256": "0236f21d454394e597f4f296244a517a60fbed3819bf5da87255cea4e7633b94",
+      "upstream_path": "docs/schemas/run.v1.schema.json"
+    },
+    {
+      "bytes": 14902,
+      "path": "schemas/summary.v1.schema.json",
+      "sha256": "938222ea67099a201a8754d7469d409d1fc02625e2442c5cf9c4b8c4c5e52671",
+      "upstream_path": "docs/schemas/summary.v1.schema.json"
+    }
+  ],
+  "format": "ssmo.tower-upstream/v1",
+  "notice": "The six interchange schemas and MIT license are copied byte-for-byte from the user-supplied bundle. Project configuration, contracts and reporter are maintained by SSMO; no Tower application files are changed.",
+  "project_reporting_standard_version": 1,
+  "repository": "https://github.com/rahel99x/Slurm-Tower",
+  "source_bundle": "Slurm-Tower-instructions-v2.3.1.zip",
+  "source_commit": "b7e28338683526453ec16ba3fb864884b5944e46"
+}

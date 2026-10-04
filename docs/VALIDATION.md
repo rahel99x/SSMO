@@ -373,3 +373,65 @@ and source mutation were both rejected with partial output preserved. These
 are local fixture checks, not execution of the user's CARC closeout. The existing
 154-test scientific audit is retained; the preservation helper changes no
 scientific implementation, test, dependency or preset.
+
+## Project-side Tower reporting
+
+SSMO now produces the formats supplied in Slurm-Tower 2.3.1 without changing
+or installing Tower. The six upstream schemas and MIT notice are retained
+byte-for-byte, with their source commit and checksums in `.tower/UPSTREAM.json`.
+Runtime reporting/imports use the project venv and standard library; scientific
+requirements, presets, tolerance, checkpoint selection and application budgets
+are unchanged. New jobs explicitly request one node and one task, use a writable
+per-job reporting WorkDir and keep frozen source read-only. Existing venv locks,
+resource review and 15/30/10-minute GPU limits remain in force.
+
+The final full CLI audit passed **199/199 CPU tests**, with zero failures,
+errors, skips, expected failures or unexpected successes and CLI exit zero,
+from an unchanged read-only source snapshot under
+`runs/ssmo-tower-audit-1791088175126086798/`. Source bytes and modes were checked
+before and after execution. The new coverage includes 18 producer tests,
+15 historical-import/planning tests, six real CLI context/log tests and
+37 mocked low-level Slurm tests. `pip check`, Bash syntax and diff checks passed.
+An earlier 198-test audit before the final cohort-identity check is retained.
+
+A real CPU workflow under `runs/ssmo-tower-integration-1791087563197496601/`
+completed generation, training, evaluation, representation, numerical, inverse
+and report stages, and retained an intentional missing-manifest training failure.
+It emitted eight distinct attempts: seven completed and one failed. The first
+integration exposed tuple-valued in-memory query metadata being rejected by
+the reporting encoder after training succeeded. The report-only normalizers
+now accept JSON-serializable tuples; the failed integration is preserved under
+`runs/ssmo-tower-integration-1791087442459253954/`. Scientific models and original
+metadata are not mutated by normalization. Escaped multiline GPU hardware
+evidence has a separate regression so reporting does not reject valid JSON.
+
+Independent Draft 2020-12 validation used an ignored project-local development
+venv, with no new runtime dependency. All six supplied schemas, local references,
+configuration and output contract passed. Twelve actual producer/CPU or mocked
+launcher attempts and 67 metric rows passed structural and native-profile checks
+for identity, finite values, duplicate keys, UTF-8/newline/progress/series limits,
+exact confined paths, parameter bounds and contract sizes. The real producer
+through a mocked CARC wrapper preserved task exits 0/23/75 as completed/failed/
+interrupted, retained exact logs and job identity, refused duplicate attempts,
+and left read-only source unchanged. Its mocked GPU utility verified the physical
+selector, 60-second sampling and owned-child cleanup. These are not live Slurm
+or GPU measurements.
+
+The final standard-library import under
+`runs/ssmo-tower-final-import-1791088230793489794/` emitted eight attempts plus
+eight planning records, retaining seven successes and the controlled failure.
+All 28 selected original artifact files remained byte-identical. Imported
+config/input identity hashes match actual recorded provenance; software and
+hardware identities use only recorded values. Its eight metric rows and
+planning bundle passed all six schema/profile checks. Original elapsed-only
+training logs were not turned into invented historical timestamps or progress;
+raw archives/checkpoints were not copied or decompressed. Earlier imports and
+their validation evidence remain preserved.
+
+Tower's native executable and CARC access are unavailable in this cloud
+workspace. Native `tower run validate` and interactive views therefore remain
+unrun here; the runbook supplies commands for the user's existing installation.
+No Tower application files or CARC jobs were changed. No resource forecast,
+scaling/workflow recipe, GPU performance claim or scientific advantage follows
+from this reporting validation. The completed pilot's failed accuracy and cost
+outcome remains unchanged.

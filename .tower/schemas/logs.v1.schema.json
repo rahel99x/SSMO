@@ -1,0 +1,67 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Tower portable log catalog v1",
+  "description": "An explicit catalog of a run's logs. Tower reads this manifest when logs.manifest_file identifies it for the selected job. Relative paths resolve against this manifest's directory, including explicit ../ sibling locations; exact absolute external paths are supported. No glob or recursive discovery is implied.",
+  "type": "object",
+  "required": ["schema", "logs"],
+  "additionalProperties": false,
+  "properties": {
+    "schema": {"const": "tower.logs/v1"},
+    "run_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"
+    },
+    "job_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^[^\\u0000-\\u001f\\u007f-\\u009f]*$",
+      "description": "If supplied, this must exactly equal the selected Slurm job ID, including its array-task or heterogeneous-job component."
+    },
+    "logs": {
+      "type": "array",
+      "maxItems": 256,
+      "items": {
+        "type": "object",
+        "required": ["id", "path"],
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$",
+            "description": "Stable, unique within this manifest. Native validation enforces ID uniqueness."
+          },
+          "path": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 4096,
+            "pattern": "^(?!~)(?!.*[\\\\*?\\[\\]\\u0000-\\u001f\\u007f-\\u009f]).+$",
+            "description": "An exact POSIX path. Relative paths are normalized against the manifest directory; absolute paths may identify another explicit location. No tilde expansion, globs, backslashes, or terminal controls. Native validation also checks the resolved path length and deduplicates resolved paths."
+          },
+          "label": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 160,
+            "pattern": "^[^\\u0000-\\u001f\\u007f-\\u009f]*$"
+          },
+          "group": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 160,
+            "pattern": "^[^\\u0000-\\u001f\\u007f-\\u009f]*$"
+          },
+          "description": {
+            "type": "string",
+            "maxLength": 512,
+            "pattern": "^[^\\u0000-\\u001f\\u007f-\\u009f]*$"
+          }
+        }
+      }
+    }
+  },
+  "$comment": "The native reader requires a stable regular UTF-8 file of at most 262144 bytes and rejects duplicate JSON keys, duplicate log IDs, mismatched job_id, controls, and non-finite JSON. Scheduler stdout/stderr are added automatically; duplicate resolved paths appear once. Catalogs contain at most 256 entries including scheduler and discovered logs; any omission is reported visibly. Availability and readability are checked when a selected log is opened."
+}
