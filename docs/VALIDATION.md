@@ -284,3 +284,45 @@ corruption. Only disposable fixture copies are now made owner-writable; the
 fresh complete audit above confirms the correction. No scientific model, preset,
 tolerance, source run or job limit was changed. Actual CARC attribution results
 await the user's execution of the command against the retained raw artifacts.
+
+## User-reported signed failure diagnostic
+
+The user's subsequent successful command saved
+`runs/ssmo-pilot-diagnostics-20261004T003557Z-2892611/` on CARC. The supplied
+terminal extract has SHA-256
+`d2d57daa33f1a51bc99c09be0b0f9f3a9220aa8fe3bcf6f3f0261188f150cf1c`.
+It reconstructs both methods on the measure-failure parents. The largest
+printed residuals are approximately `6.6e-17` (weak) and `2.1e-15` (nonlinear).
+In the declared fixed-order ledger, support-position terms dominate each
+measure audit failure, while atom-weight terms dominate the six seed-29 OOD
+worst queries. This is exploratory bookkeeping rather than unique causal
+attribution. See [CARC_REPLICATION_ASSESSMENT.md](CARC_REPLICATION_ASSESSMENT.md)
+for the values and limits. These are user-reported remote results; cloud checks
+do not independently verify access to the raw CARC files.
+
+## Existing endpoint and inverse-cost review
+
+The updated `summarize_pilots.sh` reads existing small JSON artifacts and writes
+a fresh review, without jobs, model execution or modification of source runs.
+Complete endpoint ratios pair the same physical parent and workload within
+each seed before aggregation; overlapping component timings are excluded.
+Recorded first calls remain separate from warm repeated-call medians, and are
+not process/model cold starts. GPU learners and CPU controls are labeled;
+these descriptive ratios cannot establish an accuracy-qualified speedup while
+the complete weak gate fails. Aggregate baseline fitting includes exact label
+generation and all three control fits. Training teacher costs are already
+included in training elapsed time. Inverse results preserve status, trusted
+objectives, accepted steps, reference evaluations and exact-gradient fallbacks;
+their times include diagnostic oracle gradients each iteration and are not
+autonomous-surrogate speedups. Missing measurements remain unavailable.
+
+The full CLI audit passed **154/154 CPU tests**, with zero failures, errors,
+skips or expected failures, from an unchanged read-only source snapshot under
+`runs/ssmo-cost-review-audit-20261004T004908Z-320671/`. The recorded CLI exit
+code is zero. Fourteen new tests check parent-paired ratios, workload/method
+separation, legacy and missing costs, mismatched protocols, duplicate/unmatched
+records, invalid timing data, inverse status/oracle counters and standard-library
+`-S` execution. Together with the nine existing review checks, all 23 focused
+tests passed. Synthetic fixtures and mocked Slurm do not establish actual CARC
+costs; the runbook's next command extracts those recorded values. No scientific
+configuration, model, tolerance or job limit changed.

@@ -42,6 +42,13 @@ inspection of frozen failed-parent query records. It validates receipts and
 reconstructs signed linear/nonlinear errors without loading model checkpoints.
 Its fixed-order terms may cancel; they are exploratory bookkeeping, not causal
 proof or permission to tune on the exposed audit/test cases.
+The user-reported failure diagnostic is complete; read
+docs/CARC_REPLICATION_ASSESSMENT.md. Inspect existing endpoint/inverse costs
+using `scripts/summarize_pilots.sh` with a fresh review destination before more
+experiments. Pair costs on the same physical workload, separate first calls
+from warm medians, and never sum overlapping components. Baseline fit time
+includes label generation/all controls. Inverse timing includes exact diagnostic
+gradients and trusted acceptance, so it is not autonomous learned speedup.
 
 Retain signed atoms at continuous coordinates; never multiply an atom by cell
 width or normalize signed masses as probabilities. Nonlinear field objectives

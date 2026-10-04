@@ -106,30 +106,90 @@ so these times are not matched-work speed comparisons. Seed-29/43 Slurm
 allocation durations and inference timing records were not included in this
 extract; their total billed costs or GPU-hours cannot be calculated from it.
 
-## Next step
+## Reported signed failure attribution
+
+The user subsequently supplied the successful output of
+`scripts/diagnose_pilot_failures.sh`. Its retained directory is
+`/home1/aadaniel/projects/SSMO/runs/ssmo-pilot-diagnostics-20261004T003557Z-2892611/`.
+The terminal extract has SHA-256
+`d2d57daa33f1a51bc99c09be0b0f9f3a9220aa8fe3bcf6f3f0261188f150cf1c`.
+This remains user-reported CARC evidence; the cloud workspace has not read the
+remote raw records or receipts directly. Existing source runs and settings were
+preserved, and all selected rows were reconstructed for both methods.
+
+The repeated audit's worst measure query is the same bump query (index 2), at
+time 0.6 and direction 0, in every seed:
+
+| Seed | Exact support | Predicted support | Signed weak error | Atom-position term |
+|---:|---:|---:|---:|---:|
+| 17 | 0.55 | 0.4960772991 | -0.01181978014 | -0.011006509 |
+| 29 | 0.55 | 0.4983799458 | -0.01157150363 | -0.010449785 |
+| 43 | 0.55 | 0.4997708201 | -0.01113222719 | -0.010263674 |
+
+Atom-position displacement is the largest term in this reference-anchored
+telescoping ledger. Its magnitude is roughly 90–93% of the net signed weak
+error. This is evidence about the recorded query calculation, not a unique
+causal explanation of how the network learned its chart.
+
+Seed 29's six OOD worst queries instead have atom-weight terms as the largest
+contributions. Every listed row is the same bump query at time 0.65; the selected
+directions differ by parent:
+
+| Parent | Signed weak error | Atom-weight term | Atom-position term |
+|---|---:|---:|---:|
+| `ood-000004` | +0.01029498343 | +0.012054024 | -0.0021850358 |
+| `ood-000005` | -0.01292858677 | -0.010088645 | -0.0026615789 |
+| `ood-000007` | +0.01208916116 | +0.0099622217 | +0.0019777251 |
+| `ood-000010` | -0.01101926340 | -0.0076921551 | -0.0033532507 |
+| `ood-000014` | +0.01291133545 | +0.011896619 | +0.00097309497 |
+| `ood-000026` | +0.01205264890 | +0.0098238976 | +0.0020314518 |
+
+Position contributions reinforce or partly cancel the mass error. A universal
+localization explanation would therefore be unsupported. The six measure OOD
+weak maxima improve on state-only on these parents, but the nonlinear maxima
+do not uniformly improve: state-only has smaller maxima on `ood-000004` and
+`ood-000010`. Each method's printed worst query may differ; matched comparisons
+must use the retained `failures.jsonl` rows.
+
+The largest printed reconstruction residuals over both methods are approximately
+`6.6e-17` for weak errors and `2.1e-15` for nonlinear errors. This confirms
+agreement with the stored calculations; it does not make the learned predictions
+accurate. The measure fixed-audit nonlinear errors are 0.01196970452,
+0.02324352706 and 0.01489061758. The linear tolerance 0.01 does not define a new
+nonlinear-objective gate. Zero-direction rows are retained; this targeted review
+does not cover every state-only failure, classical row or unseen parent.
+
+The next evidence to inspect is already in each frozen `evaluation.json`:
+paired complete endpoint timings, aggregate control-fitting costs and the
+trusted inverse-task results. The report stages already exercised exact
+pre-collision reference controls, so repeating that identical CPU job is not
+needed. Keep the existing diagnostics and inspect costs before another study.
+
+## Progression
 
 The three-seed pilot is complete. Keep the preset, tolerance and sealed protocol
 frozen. More seeds or longer A100 allocations are not justified by these
 results. Follow [SCIENCE_SCOPE.md](SCIENCE_SCOPE.md) in this order:
 
-1. Inspect the existing per-parent/query records on CPU. Identify the failing
-   parent, time, direction and query; retain every seed and all failures. Use
-   `artifacts/log-compaction.json` to resolve compressed raw files. Reconstruct
-   exact fronts from the recorded initial parameters, then decompose the signed
-   weak error into diffuse coefficient, diffuse-boundary displacement,
-   atom-weight and atom-position contributions, with a reconstruction residual.
-   Compare nonlinear payoff-jump errors separately. This is exploratory failure
-   attribution, without training, checkpoint reselection or tolerance changes.
+1. Preserve the completed signed diagnostic above and inspect existing complete
+   endpoint/inverse costs with the updated `scripts/summarize_pilots.sh`. Compare
+   the same parent/direction/query workload within each seed; keep first-call
+   timings separate and never sum overlapping component measurements. Control
+   fitting includes exact-label generation and all three classical/grid fits,
+   not an isolated front-only fit. The inverse audit computes trusted gradients
+   every iteration, even when using learned proposals; its timings do not
+   establish autonomous-surrogate speedup or parameter recovery.
 2. Require an explicit downstream accuracy/cost target and strong classical
    controls before another learned study. Any revised model/data protocol must
    select settings on independent validation and reserve a fresh final holdout
    before fitting. Exposed audit/test cases cannot select the revised settings
    or serve as its confirmatory holdout.
-3. Prepare a small CPU exact-reference study of two noninteracting shocks, with
-   an explicit margin from collision/boundary events. Check FP64 weak queries,
-   payoff jumps, direction linearity and state/tangent finite variation against
-   classical fronts. This uses the existing pre-collision reference calculus;
-   it does not claim a learned multiple-front implementation. Learned collision
-   logic, inverse efficacy and broader PDE/GPU campaigns remain gated.
+3. Broader two-front arrangement studies need a new declared protocol and an
+   explicit margin from collision/boundary events. Existing report audits already
+   exercise pre-collision FP64 reference calculus; a repeat is not learned
+   multiple-front evidence. If the complete error/cost and downstream review
+   supplies no material benefit, narrow this experiment to correctness and
+   representation diagnostics. Learned collision logic, inverse efficacy and
+   broader PDE/GPU campaigns remain gated.
 
 No scientific settings, model code or job limits were changed from this review.

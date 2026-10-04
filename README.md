@@ -109,6 +109,9 @@ Use `bash scripts/diagnose_pilot_failures.sh --review-dir runs/<review-id>` to
 reconstruct their signed diffuse/atom errors from existing records. It streams
 plain or verified gzip logs, compares both learned methods on those parents,
 and writes a fresh contained review without model execution or GPU jobs.
+The updated `summarize_pilots.sh` also pairs complete learned/classical endpoint
+timings and extracts the already recorded trusted inverse-task results. See the
+runbook for a fresh cost-review destination and the limits of those comparisons.
 
 Every allocation charges `anakano_81`; project storage is
 `/home1/aadaniel/projects/SSMO`. CPU stages use `main`; GPU stages use `gpu`.

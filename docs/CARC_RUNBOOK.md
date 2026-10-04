@@ -318,6 +318,53 @@ Read `summary.txt` in the printed destination and retain its `summary.json`,
 another learned experiment. This is exploratory inspection of exposed failures;
 changed settings still require independent validation and a fresh final holdout.
 
+### Review existing endpoint costs and trusted inverse results
+
+The user completed the failure diagnostic and preserved
+`runs/ssmo-pilot-diagnostics-20261004T003557Z-2892611/`. Its ledger shows repeated
+audit support-position errors and seed-29 OOD atom-weight errors. Keep that
+result; no repeat of the diagnostic or pilot stages is needed.
+
+Collect the next evidence from the existing evaluation summaries:
+
+```bash
+cd /home1/aadaniel/projects/SSMO
+git pull --ff-only
+export SSMO_PROJECT_ROOT="$PWD"
+unset SSMO_ROOT
+bash scripts/summarize_pilots.sh \
+  --output-dir runs/ssmo-pilot-cost-review-001
+```
+
+Use another fresh output name if that destination already exists. This reads
+small saved JSON files using the existing Python 3.12.8 venv, submits no jobs
+and runs no model or optimizer. The original review, diagnostic and source runs
+remain intact. The same `summary.json`, `summary.txt` and `provenance.json`
+outputs now include cost and inverse sections.
+
+Expected: separate summaries for seeds 17, 29 and 43, with complete endpoint
+timings matched by physical parent, number of directions and number of queries.
+Warm repeated-call medians and recorded first-call timings are kept separate;
+the first call is not a process/model cold start. Learned endpoints include
+the forward chart, directional assembly, requested queries and host transfer.
+Classical/exact controls run on CPU; the learned charts run on the recorded GPU.
+Positive learned/control ratios above one mean the recorded learned endpoint
+was slower on that paired workload. These measurements do not establish an
+accuracy-qualified speedup while the complete weak gate fails, and overlapping
+component measurements must not be added together.
+
+Control `fit_seconds` includes label generation and all classical/grid fits;
+it is not isolated classical-front training time. The fixed inverse comparison
+reports trusted initial/final objectives, accepted steps, status, reference
+evaluations, exact-gradient fallbacks and application time. Exact diagnostic
+gradients and trusted objective acceptance are used even with learned proposals;
+the timings are audited task costs, not autonomous-surrogate speedups. A single
+fixed initialization and tracking target do not establish parameter recovery.
+Missing costs are marked unavailable rather than replaced with zero.
+
+Share the printed cost/inverse sections. Keep tolerance and settings frozen;
+review this final existing evidence before any new scientific protocol.
+
 ## 6. Inspect the important outputs
 
 `status` reads actual IDs from `runs/<run-id>/jobs.tsv`, calls `squeue` and `sacct`,
