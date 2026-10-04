@@ -112,6 +112,10 @@ and writes a fresh contained review without model execution or GPU jobs.
 The updated `summarize_pilots.sh` also pairs complete learned/classical endpoint
 timings and extracts the already recorded trusted inverse-task results. See the
 runbook for a fresh cost-review destination and the limits of those comparisons.
+The user-reported three-seed cost review closes this single-front learned pilot:
+the full weak gate fails and measured exact/classical endpoints are faster.
+Use `scripts/close_pilot.sh` to retain small evidence copies and checksums, with
+all original runs preserved; broader learned studies remain gated.
 
 Every allocation charges `anakano_81`; project storage is
 `/home1/aadaniel/projects/SSMO`. CPU stages use `main`; GPU stages use `gpu`.

@@ -159,37 +159,116 @@ accurate. The measure fixed-audit nonlinear errors are 0.01196970452,
 nonlinear-objective gate. Zero-direction rows are retained; this targeted review
 does not cover every state-only failure, classical row or unseen parent.
 
-The next evidence to inspect is already in each frozen `evaluation.json`:
-paired complete endpoint timings, aggregate control-fitting costs and the
-trusted inverse-task results. The report stages already exercised exact
-pre-collision reference controls, so repeating that identical CPU job is not
-needed. Keep the existing diagnostics and inspect costs before another study.
+The subsequent cost review below supplies complete endpoint timings, aggregate
+control-fitting costs and the trusted inverse-task results. The report stages
+already exercised exact pre-collision reference controls; repeating those
+identical CPU jobs is not needed.
+
+## Reported endpoint and inverse costs
+
+The user's successful updated `summarize_pilots.sh` output saved
+`/home1/aadaniel/projects/SSMO/runs/ssmo-pilot-cost-review-001/`.
+The supplied terminal extract has SHA-256
+`2ed93de431ee40acb47c6b59b6f440ea3a07a26829953d9691153cbd262a02b2`.
+These are user-reported CARC measurements; the cloud workspace has not fetched
+the remote JSON records or independently verified their receipts. The new
+extract retains the same accuracy counts, hardware, protocol and tolerance.
+
+Complete warm endpoint ratios pair each physical parent and workload within
+one method's own evaluation, before descriptive aggregation. The learned
+endpoints run on the A100; the exact and classical front controls run on CPU.
+Ratios greater than one mean the recorded learner was slower:
+
+| Seed | Workload: directions × queries | Matched parents | Measure / exact median ratio | Measure / classical median ratio |
+|---:|---:|---:|---:|---:|
+| 17 | 1 × 1 | 62 | 91.2214 | 26.5935 |
+| 29 | 1 × 1 | 62 | 88.3684 | 26.3572 |
+| 43 | 1 × 1 | 62 | 91.7009 | 26.1001 |
+| 17 | 1 × 6 | 1 | 19.4532 | 12.6536 |
+| 29 | 1 × 6 | 1 | 18.3432 | 12.5776 |
+| 43 | 1 × 6 | 1 | 19.5285 | 12.8345 |
+| 17 | 3 × 6 | 61 | 16.8188 | 11.3674 |
+| 29 | 3 × 6 | 61 | 16.2056 | 11.1156 |
+| 43 | 3 × 6 | 61 | 16.8614 | 11.2733 |
+
+For the 3 × 6 workload, median measure endpoint time is approximately
+11.4 ms, compared with 0.677–0.706 ms for exact and 1.004–1.029 ms for classical
+front regression. These separate duration medians are descriptive; the ratios
+above are medians of per-parent ratios, not ratios of aggregated medians.
+State-only endpoints have a similar recorded disadvantage. Every listed warm
+and first-call workload is slower for both learned methods than its controls.
+First-call timings are not process/model cold starts. Component timings overlap
+and are excluded from complete endpoint totals. Parents are reused across seeds.
+
+This establishes a cost disadvantage for the measured implementation, hardware
+and small workloads. It does not establish universal hardware-independent
+complexity or predict unmeasured cross-parent batching, larger workloads or
+other GPU models. There is no positive training-amortization break-even on
+these recorded workloads: learned inference is already slower before its
+training costs are included.
+
+The measure evaluations report aggregate control fitting of 5.53707, 5.58508
+and 5.62544 seconds. These include exact training-label generation and all three
+front/state/direct-grid fits, so they are not isolated classical-front fitting
+costs or matched training budgets. Measure training teacher costs are
+20.5245–22.4246 seconds, with validation teacher costs about 0.09 seconds;
+these are already within the 40.380–44.372-second training times and must not
+be added again. The extract still does not supply complete seed-29/43 Slurm
+allocation durations or billed service units.
+
+The fixed inverse audit uses a common trusted initial objective of 1.7187095:
+
+| Seed | Measure final trusted objective | Exact final trusted objective | Measure task seconds | Exact task seconds | Measure / exact task-time ratio |
+|---:|---:|---:|---:|---:|---:|
+| 17 | 0.025685129 | 0.025678749 | 0.214216 | 0.0104682 | 20.46 |
+| 29 | 0.025676573 | 0.025678749 | 0.215034 | 0.0105141 | 20.45 |
+| 43 | 0.025679809 | 0.025678749 | 0.214272 | 0.0101308 | 21.15 |
+
+All measure, state-only and exact records complete 16/16 accepted steps with
+zero exact-gradient fallbacks, 18 trusted objective evaluations and 48 exact
+reference-gradient evaluations. Measure reaches approximately the same final
+objective as exact in this audit; there is no declared tolerance that turns
+that observation into general inverse efficacy. State-only also reaches a
+similar final objective despite its lower weak-query pass counts. The inverse
+audit does not replace the full weak-query gate.
+
+Task times include exact diagnostic gradients every iteration and trusted
+objective acceptance, including when learned proposals are used. They show no
+observed task-cost benefit here, and cannot establish autonomous learned
+optimization or parameter recovery from one fixed initialization and target.
 
 ## Progression
 
-The three-seed pilot is complete. Keep the preset, tolerance and sealed protocol
-frozen. More seeds or longer A100 allocations are not justified by these
-results. Follow [SCIENCE_SCOPE.md](SCIENCE_SCOPE.md) in this order:
+The three-seed pilot, signed diagnostic and cost review are complete. The learned
+measure chart passes more supported parents than state-only, but fails the full
+declared weak gate and has no recorded endpoint or inverse-cost benefit over the
+strong exact/classical controls. Apply the proposal's stop/narrow condition:
+close this single-front
+learned pilot and retain it as correctness/representation evidence. Use exact
+reference calculus for this implemented analytic family, with classical front
+regression retained as the learned-control comparison. This is not a novelty
+or broader learned-PDE claim.
 
-1. Preserve the completed signed diagnostic above and inspect existing complete
-   endpoint/inverse costs with the updated `scripts/summarize_pilots.sh`. Compare
-   the same parent/direction/query workload within each seed; keep first-call
-   timings separate and never sum overlapping component measurements. Control
-   fitting includes exact-label generation and all three classical/grid fits,
-   not an isolated front-only fit. The inverse audit computes trusted gradients
-   every iteration, even when using learned proposals; its timings do not
-   establish autonomous-surrogate speedup or parameter recovery.
+Keep the preset, tolerance and sealed protocol frozen. Follow
+[SCIENCE_SCOPE.md](SCIENCE_SCOPE.md) in this order:
+
+1. Preserve all three source runs and the completed replication, diagnostic and
+   cost reviews. Run `scripts/close_pilot.sh` to retain small copies, checksums
+   and this assessment in a fresh contained directory. It does not rerun any
+   scientific stage, copy large raw logs/checkpoints or cancel jobs. Verify the
+   printed checksums and keep the original runs; the closeout is not a complete
+   backup or an independent revalidation of the earlier receipts.
 2. Require an explicit downstream accuracy/cost target and strong classical
    controls before another learned study. Any revised model/data protocol must
    select settings on independent validation and reserve a fresh final holdout
    before fitting. Exposed audit/test cases cannot select the revised settings
    or serve as its confirmatory holdout.
-3. Broader two-front arrangement studies need a new declared protocol and an
-   explicit margin from collision/boundary events. Existing report audits already
-   exercise pre-collision FP64 reference calculus; a repeat is not learned
-   multiple-front evidence. If the complete error/cost and downstream review
-   supplies no material benefit, narrow this experiment to correctness and
-   representation diagnostics. Learned collision logic, inverse efficacy and
-   broader PDE/GPU campaigns remain gated.
+3. Broader two-front arrangement studies need an independently justified regime,
+   a new declared protocol and an explicit margin from collision/boundary events.
+   Existing report audits already exercise pre-collision FP64 reference calculus;
+   a repeat is not learned multiple-front evidence. No additional initialization,
+   architecture search, timing repeat or longer A100 training is warranted for
+   the completed pilot. Learned collision logic, inverse efficacy and broader
+   PDE/GPU campaigns remain gated.
 
 No scientific settings, model code or job limits were changed from this review.

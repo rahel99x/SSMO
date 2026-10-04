@@ -11,6 +11,12 @@ Use username `aadaniel`, account `anakano_81`, standalone module
 inspection, editing, discovery, submission and monitoring. The Bash frontend
 runs installation and computational stages through Slurm and `srun`.
 
+The user's three-seed pilot, signed diagnostic and cost review are complete.
+The current next step is [closeout](#close-the-completed-single-front-pilot);
+retain the evidence and frozen settings. Earlier sections document how those
+stages were run. Further GPU runs for this pilot are not justified by its
+reported error/cost results.
+
 ## 1. Get the current code
 
 With `/home1/aadaniel/projects` already present and `SSMO` absent or empty:
@@ -265,8 +271,9 @@ The user's completed frozen review reports measure passes of 61/62, 55/62 and
 61/62 at seeds 17, 29 and 43; all three fail the fixed shock audit at tolerance
 0.01. Classical front regression passes 62/62 in each seed. The review is saved
 under `runs/ssmo-pilot-review-20261004T000302Z-2641811/`. Preserve it and the three
-source runs; these replications are complete and need no rerun. Follow the CPU
-failure-attribution plan in
+source runs; these replications are complete and need no rerun. The subsequent
+signed diagnostic and cost review below are also complete. Follow the closeout
+decision in
 [CARC_REPLICATION_ASSESSMENT.md](CARC_REPLICATION_ASSESSMENT.md) before further
 learned experiments. The assessment does not change any submission settings.
 
@@ -364,6 +371,63 @@ Missing costs are marked unavailable rather than replaced with zero.
 
 Share the printed cost/inverse sections. Keep tolerance and settings frozen;
 review this final existing evidence before any new scientific protocol.
+
+### Close the completed single-front pilot
+
+The user has now completed `runs/ssmo-pilot-cost-review-001/`. On the recorded
+3-direction/6-query workload, measure endpoints are 16.21–16.86 times slower
+than exact CPU fronts and 11.12–11.37 times slower than classical front
+regression. The inverse audit reaches similar trusted objectives but uses
+20.45–21.15 times the exact task time, including exact diagnostic gradients.
+Classical passes every supported parent; every measure seed fails the full
+weak gate. Read [CARC_REPLICATION_ASSESSMENT.md](CARC_REPLICATION_ASSESSMENT.md).
+
+Close this learned single-front pilot and retain correctness/representation
+evidence. Preserve the frozen settings, all source runs and selected/latest
+checkpoints. No new jobs or repeated diagnostic/timing stages are needed.
+
+```bash
+cd /home1/aadaniel/projects/SSMO
+git pull --ff-only
+export SSMO_PROJECT_ROOT="$PWD"
+unset SSMO_ROOT
+bash scripts/close_pilot.sh \
+  --output-dir runs/ssmo-pilot-closeout-001
+```
+
+The defaults point to the completed replication review
+`runs/ssmo-pilot-review-20261004T000302Z-2641811/`, diagnostic
+`runs/ssmo-pilot-diagnostics-20261004T003557Z-2892611/` and cost review
+`runs/ssmo-pilot-cost-review-001/`. Override the corresponding options only
+when retaining another already completed review. Use a fresh output name if
+the destination exists.
+
+Expected: a new contained directory with small review copies, `assessment.md`,
+`source-checksums.sha256`, `SHA256SUMS` and an evidence index. The Bash-only
+command checks copied hashes and unchanged originals; it runs no Python,
+training, optimizer or Slurm job. It does not copy full raw logs/checkpoints,
+delete anything, change submission limits or cancel queued jobs. It preserves
+partial output if a later check fails. These checks identify the files at
+closeout time; they do not independently revalidate past provenance receipts,
+reproduce the measurements or provide a full backup of the source runs.
+
+Verify the retained copies and the original small review files:
+
+```bash
+(
+  cd /home1/aadaniel/projects/SSMO/runs/ssmo-pilot-closeout-001
+  sha256sum --check SHA256SUMS
+)
+sha256sum --check runs/ssmo-pilot-closeout-001/source-checksums.sha256
+```
+
+Expected: every entry prints `OK`. Keep the originals where they are. Share the
+closeout confirmation only if a check fails; the scientific review is complete.
+A new learned study first needs a specific downstream accuracy/cost requirement
+and a regime where strong classical controls leave a material unmet need, with
+independent validation and a fresh final holdout declared before fitting.
+Until then, use the implemented exact reference for this analytic family and
+retain the classical front regression as its learning comparison.
 
 ## 6. Inspect the important outputs
 

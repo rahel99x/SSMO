@@ -326,3 +326,50 @@ records, invalid timing data, inverse status/oracle counters and standard-librar
 tests passed. Synthetic fixtures and mocked Slurm do not establish actual CARC
 costs; the runbook's next command extracts those recorded values. No scientific
 configuration, model, tolerance or job limit changed.
+
+## User-reported completed endpoint and inverse-cost review
+
+The user's successful updated review saved `runs/ssmo-pilot-cost-review-001/`
+on CARC. Its supplied terminal extract has SHA-256
+`2ed93de431ee40acb47c6b59b6f440ea3a07a26829953d9691153cbd262a02b2`.
+The measure chart still passes 61/62, 55/62 and 61/62 parents at seeds 17, 29
+and 43; classical passes 62/62 each time. Warm complete endpoints on the
+3-direction/6-query workload have per-seed paired median measure/exact ratios
+16.8188, 16.2056 and 16.8614, and measure/classical ratios 11.3674, 11.1156 and
+11.2733. Every listed learned endpoint workload is slower than its CPU controls.
+Inverse measure/exact task-time ratios are about 20.46, 20.45 and 21.15, with
+similar final trusted objectives, 16/16 accepted steps and zero fallbacks.
+Each record includes 18 trusted objective and 48 exact reference-gradient
+evaluations. These observations do not establish autonomous optimization,
+parameter recovery or a hardware-independent complexity result.
+
+The reported error/cost evidence warrants closing this single-front learned
+pilot and retaining correctness/representation diagnostics. No scientific
+source, configuration, tolerance, job limit or dependency changes follow from
+the review. The prior 154-test result remains the applicable full CPU audit;
+these remote measurements are supplied by the user, not cloud-executed jobs.
+
+## Lightweight pilot evidence closeout
+
+`scripts/close_pilot.sh` is Bash-only and preserves copies of ten small files
+from the completed replication, diagnostic and cost reviews, plus this pilot's
+assessment. It does not load Python, initialize caches, traverse the raw runs,
+submit/cancel jobs or change scientific settings. It snapshots source checksums,
+compares all eleven copies byte-for-byte with their originals, verifies unchanged
+originals and checks the copied bundle manifest. The mutable assessment original
+is checked during copying and excluded from the later frozen-source manifest;
+its preserved copy remains covered by `SHA256SUMS`. Source runs remain necessary:
+the small bundle is not a complete backup or an independent verification of
+past provenance receipts.
+
+Bash syntax/help checks and focused contained fixtures passed under
+`local/closeout-fixture-20261004T012535Z-338667/`. The successful fixture verified
+10 frozen source entries, 11 original/copy byte comparisons and 14 bundle
+checksum entries (15 files including `SHA256SUMS`), with unchanged originals.
+Nine refusal checks cover existing output preservation, missing input, directory,
+file and output-parent symlink aliases, path escape, overlapping reviews,
+checkout mismatch and the CARC canonical-root guard. Controlled copy corruption
+and source mutation were both rejected with partial output preserved. These
+are local fixture checks, not execution of the user's CARC closeout. The existing
+154-test scientific audit is retained; the preservation helper changes no
+scientific implementation, test, dependency or preset.
