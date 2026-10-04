@@ -31,6 +31,9 @@ freshness excludes PENDING rows. Keep queued-SSMO protection against venv change
 Open `local/venv.lock` read/write (`9<>`) for both shared task locks and exclusive
 installation locks; shared locks on network filesystems can reject write-only
 descriptors. Keep the lockfile inode and distinguish contention from lock errors.
+Use `scripts/summarize_pilots.sh` to review completed pilot replications. It reads
+existing artifacts with the venv and standard library; never pool repeated
+physical parents across initialization seeds or choose the best seed afterward.
 
 Retain signed atoms at continuous coordinates; never multiply an atom by cell
 width or normalize signed masses as probabilities. Nonlinear field objectives

@@ -94,6 +94,12 @@ verified hashes and a path mapping; training logs and checkpoints remain intact.
 The [configuration evidence](docs/CONFIG_TUNING.md) describes the bounded CPU
 validation search; these are measured starter settings, not GPU-specific optima.
 
+After the frozen seed-17, seed-29 and seed-43 pilots finish, run
+`bash scripts/summarize_pilots.sh` to compare their saved accuracy, stopping and
+cost records. It uses only the standard library and the project venv, writes a
+fresh review inside SSMO and keeps each initialization seed separate. See the
+[runbook](docs/CARC_RUNBOOK.md) for custom run IDs and review criteria.
+
 Every allocation charges `anakano_81`; project storage is
 `/home1/aadaniel/projects/SSMO`. CPU stages use `main`; GPU stages use `gpu`.
 A100 40 GB, A40, A30, L40 and L40S are separate profiles. Only currently observed

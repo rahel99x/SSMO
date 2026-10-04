@@ -209,3 +209,23 @@ The complete scientific accuracy gate remains unmet despite successful execution
 See [CARC_PILOT_ASSESSMENT.md](CARC_PILOT_ASSESSMENT.md) for cohort counts, costs,
 early stopping, reported memory and evidence limits. No preset, tolerance or
 scientific implementation was changed in response to these sealed results.
+
+## Frozen pilot replication review command
+
+`bash scripts/summarize_pilots.sh` reads the completed seed-17, seed-29 and
+seed-43 artifacts with the project venv and standard library. It checks the
+frozen scientific configuration/source, parent manifest, installed dependencies,
+GPU/kernel protocol and selected checkpoint evidence, and writes a fresh
+contained JSON/text review with input checksums. Source artifacts are unchanged.
+Each seed is reported separately; repeated physical parents are not pooled and
+duplicate classical-control rows are counted once. The helper does not train,
+load checkpoint objects, import GPU libraries or submit jobs.
+
+The revision passed **125/125 CPU tests**, with zero failures, errors, skips
+or expected failures, from an unchanged read-only source copy under
+`runs/ssmo-summary-audit-20261003T235737Z-261396/`. The CLI exit code was zero.
+Nine focused regression checks cover the three distinct seed paths, mismatch
+refusal, checkpoint selection, source preservation, symlink containment,
+standard-library-only execution and the Bash wrapper in a simulated Slurm
+allocation. These checks use synthetic artifact fixtures; the user's actual
+seed-29/43 accuracy and cost results await the generated CARC review.

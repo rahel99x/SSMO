@@ -218,6 +218,49 @@ measured costs, alternatives and limitations. Sealed test results never choose
 hyperparameters. Each invocation runs one seed; `[17,29,43]` is a replication
 plan, not an automatic sweep. Recheck variability and capacity before replication.
 
+### Review the completed three-seed pilot
+
+After `ssmo-pilot-001` (seed 17), `ssmo-pilot-seed29` and `ssmo-pilot-seed43`
+finish, collect their existing results with one Bash command:
+
+```bash
+cd /home1/aadaniel/projects/SSMO
+git pull --ff-only
+export SSMO_PROJECT_ROOT="$PWD"
+unset SSMO_ROOT
+bash scripts/summarize_pilots.sh
+```
+
+This is lightweight JSON inspection using the standalone Python module and
+project `.venv`. It submits no Slurm jobs and imports no GPU libraries. The
+printed summary is also saved as `summary.txt`, alongside `summary.json` and
+an input-checksum receipt in `provenance.json`, under a fresh
+`runs/ssmo-pilot-review-.../` directory. Existing runs and checkpoints are kept.
+
+For other run IDs or a chosen fresh destination:
+
+```bash
+bash scripts/summarize_pilots.sh \
+  --run ssmo-pilot-001 --run ssmo-pilot-seed29 --run ssmo-pilot-seed43 \
+  --output-dir runs/ssmo-pilot-review-001
+```
+
+The helper derives each seed from recorded training jobs and checks compatible
+scientific configuration, parent manifests and evaluation protocols. Missing
+results, inconsistent comparisons or an existing destination are errors, not
+silently skipped runs. Each seed's measure/state-only counts, fixed audit,
+stopping reason, application time and error diagnostics stay separate.
+Classical-control rows repeated across the two evaluations are counted once.
+The same physical parents across three seeds are not three times as many
+independent data samples. A passing weak-query gate alone does not establish a
+research advantage or complete nonlinear/event accuracy.
+
+Review all seeds before changing the model. Diagnose support, atom-weight,
+nonlinear-gradient and direction-consistency errors using the saved records.
+Keep the preset and tolerance frozen; a changed scientific protocol requires
+validation and a fresh final holdout. Prepare exact-reference multiple-front
+tests before progressing to learned collision logic or larger PDE regimes.
+
 ## 6. Inspect the important outputs
 
 `status` reads actual IDs from `runs/<run-id>/jobs.tsv`, calls `squeue` and `sacct`,
