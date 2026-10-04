@@ -162,6 +162,7 @@ lines; independent attempts never share a stream.
 | Metric line | At most 65,536 bytes; at most 64 stable metric names |
 | Metric stream | 4 MiB in SSMO's contract; native reader retains bounded recent samples |
 | Planning bundle | 1 MiB; at most 10,000 history rows, depth 32 and 100,000 JSON values |
+| Existing scientific input JSON | 32 MiB and two million values, depth 32; validated once and compacted before Tower publication |
 | Scientific cohort parameters | Depth four, at most 128 total JSON values and 64 members per object/list |
 | Output contract | 256 KiB; exact unique paths and ordered size/row bounds |
 
@@ -189,3 +190,11 @@ duplicate-key, path, progress, comparability and I/O constraints. A schema
 pass cannot establish file availability or scientific validity. Check native
 readers using the user's existing Tower installation; do not install or
 modify Tower as part of SSMO reporting.
+
+`tower.sh validate/launch` require an executable on PATH. Shell aliases and
+functions are not inherited by the Python launcher. When `tower` is an alias,
+invoke it directly in the interactive shell with absolute SSMO contract,
+configuration, planning and attempt paths as shown in the CARC runbook.
+Experiment graphs numeric metrics; use indexed JSON artifacts/logs for nested
+scientific results. An incomplete import has no `index.json`; retain it and
+retry in a fresh export before planning or selecting an attempt.

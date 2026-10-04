@@ -435,3 +435,50 @@ No Tower application files or CARC jobs were changed. No resource forecast,
 scaling/workflow recipe, GPU performance claim or scientific advantage follows
 from this reporting validation. The completed pilot's failed accuracy and cost
 outcome remains unchanged.
+
+## Large scientific sources and the user's Tower alias
+
+The user's first CARC Tower import stopped with `JSON exceeds depth/value
+budget`. Because publication stopped before `index.json`, subsequent planning,
+listing and attempt selection had no completed index; the selected attempt
+variable became empty. The supplied shell output also identifies `tower` as
+the alias `_slurm_tower`, which executable PATH lookup in Python cannot inherit.
+
+The scientific reader had reused Tower's 100,000-value planning/output profile
+before reducing a full source review. A realistic three-seed cost-review fixture
+reproduced that failure with **150,478 values, 3,549,867 bytes and depth 15**.
+Source inputs now retain a separate **32-MiB/two-million-value/depth-32** limit.
+An iterator traversal validates without re-serializing the source or allocating
+another stack proportional to its full width. Native planning still enforces
+**1 MiB/100,000 values/depth 32**, and per-attempt, metric and log limits remain
+unchanged. Duplicate keys, nonfinite constants, exponent overflow, oversized
+integers, traversal/symlink paths and excessive source depth/count remain errors.
+Diagnostics now identify the exact input file or incomplete export.
+
+The large review imports without changing original bytes, preserving six distinct
+seed/method records, 36 workload/control endpoint records, unequal warm/cold
+ratio statistics and the failed audit cohort. Its raw paired/endpoint repetitions
+remain original evidence references rather than bulk Tower JSON. A new stage
+selector prints a bounded exact absolute evaluation path or fails clearly when
+none exists. Empty attempts and executable-only launcher limitations have
+regression coverage. The CARC runbook retains partial `001`, retries into fresh
+`002`, stops dependent commands on failure and invokes the existing interactive
+Tower alias directly with absolute paths. Native Experiment displays numeric
+observations; full scientific results remain indexed JSON artifacts/logs.
+
+The corrected full CLI audit passed **204/204 CPU tests**, zero failures,
+errors, skips or expected failures, with CLI exit zero and unchanged source bytes
+and modes under `runs/ssmo-tower-audit-1791089358851536371/`. All 20 exporter tests
+passed, including five new source/selection/failure regressions. Bash syntax and
+diff checks passed. No source pilot, scientific setting, dependency, GPU budget
+or Tower application was changed. Actual CARC import/native checks await the
+user's fresh export; these local checks do not establish access to remote files.
+
+An independent check under
+`runs/ssmo-tower-large-source-check-1791089516107156288/` validated the large
+synthetic export against all six copied Draft 2020-12 schemas and native profile
+bounds, with its original source hash unchanged. Actual `zsh -f` sourced
+`carc_env.sh` and ran `ssmo_env`; the verbatim runbook block passed both commands
+to a mock Tower alias with correct absolute paths even after the alias changed
+directories. Its cache environment stayed inside SSMO. This verifies shell and
+argument handling, not native Tower execution or CARC access.

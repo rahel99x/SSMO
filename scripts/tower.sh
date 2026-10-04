@@ -9,13 +9,15 @@ Usage: bash scripts/tower.sh COMMAND [OPTIONS]
            [--accounting | --accounting-file PATH]
   planning --export-dir PATH ... [--attempt-dir PATH ...] [--reference PATH]
            [--output reports/NAME.json] [--replace]
-  list     --export-dir PATH
+  list     --export-dir PATH [--stage STAGE] [--first] [--absolute]
   validate --attempt-dir PATH [--planning-file PATH]
   launch   --attempt-dir PATH [--planning-file PATH]
 Imports read existing artifacts into a fresh export; original runs stay intact.
 No scientific jobs run. --accounting makes one bounded sacct query, never polls.
 Planning contains only explicit attempts, preserves failures/unknown resources,
 and refuses overwrite unless --replace is explicit. Tower must already exist.
+validate/launch require a Tower executable on PATH; for a shell alias/function,
+invoke tower directly in your shell as documented in docs/CARC_RUNBOOK.md.
 USAGE
     exit 0
 fi

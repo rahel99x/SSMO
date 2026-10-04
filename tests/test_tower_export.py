@@ -1,5 +1,7 @@
 """Historical exports preserve source evidence and do not invent scheduler facts."""
 import hashlib
+from contextlib import redirect_stderr, redirect_stdout
+import io
 import json
 import os
 from pathlib import Path
@@ -275,6 +277,188 @@ class TowerExportTests(unittest.TestCase):
             deep = {"nested": deep}
         with self.assertRaises(ValueError):
             export.encoded(deep)
+
+    def test_full_three_seed_cost_review_imports_more_than_native_value_limit_unchanged(self):
+        """Raw endpoint/pair repetitions belong to source evidence, not Tower output."""
+        directory = self.root / "runs" / "ssmo-full-cost-review"
+        directory.mkdir()
+
+        def endpoint(parent_id, method, directions, queries, cuda, warm_seconds, cold_seconds):
+            return {"parent_id": parent_id, "method": method, "directions": directions, "queries": queries,
+                    "endpoint": "initial inputs -> forward chart -> directional assembly -> all requested weak queries; includes host transfer",
+                    "measurement": {"cold_call_seconds": cold_seconds, "seconds": [warm_seconds] * 5,
+                                    "median_seconds": warm_seconds, "warmup": 2, "repeats": 5,
+                                    "cuda_synchronized": cuda}}
+
+        runs = []
+        for seed in (17, 29, 43):
+            methods = {}
+            for method in ("measure", "state_only"):
+                comparisons, raw_endpoints = [], []
+                for control in ("exact_front", "classical_front_regression"):
+                    workloads = []
+                    for directions, queries in ((1, 1), (1, 6), (3, 6)):
+                        pairs = []
+                        warm_ratio = (10.0 + seed / 100 + (2.0 if method == "state_only" else 0.0)
+                                      + (0.5 if control == "classical_front_regression" else 0.0)
+                                      + directions / 10 + queries / 1000)
+                        cold_ratio = warm_ratio + 3.0
+                        for index in range(62):
+                            parent_id = f"test-{index:06d}"
+                            learned = endpoint(parent_id, method + "_chart", directions, queries,
+                                               True, 0.001 * warm_ratio, 0.002 * cold_ratio)
+                            cpu = endpoint(parent_id, control, directions, queries, False, 0.001, 0.002)
+                            pairs.append({"parent_id": parent_id, "learned": learned, "control": cpu,
+                                          "warm_learned_over_control": warm_ratio, "cold_learned_over_control": cold_ratio})
+                            raw_endpoints.append(cpu)
+                            if control == "exact_front":
+                                raw_endpoints.append(learned)
+                        warm_distribution = {"median": warm_ratio, "p90": warm_ratio, "minimum": warm_ratio, "maximum": warm_ratio}
+                        cold_distribution = {"median": cold_ratio, "p90": cold_ratio, "minimum": cold_ratio, "maximum": cold_ratio}
+                        workloads.append({"directions": directions, "queries": queries,
+                                          "matched_physical_parents": 62, "learned_device": "cuda:0", "control_device": "cpu",
+                                          "paired_records": pairs, "warm": {"status": "available", "learned_over_control": warm_distribution},
+                                          "cold": {"status": "available", "learned_over_control": cold_distribution}})
+                    comparisons.append({"control": control, "status": "available", "workloads": workloads})
+                methods[method] = {"total": {"physical_parents": 62, "passed": 61, "failed": 1, "invalid_chart_rows": 0},
+                                   "cohorts": [{"split": "audit", "family": "shock", "physical_parents": 1,
+                                                "passed": 0, "failed": 1, "invalid_chart_rows": 0,
+                                                "worst_errors": {"absolute_error_max": 0.011 + seed / 100000
+                                                                 + (0.002 if method == "state_only" else 0.0)}}],
+                                   "endpoint_costs": {"comparisons": comparisons, "raw_endpoint_records": raw_endpoints}}
+            runs.append({"run_id": "ssmo-pilot-seed" + str(seed), "seed": seed, "methods": methods})
+        review = {"schema_version": 1, "runs": runs,
+                  "independent_unit": "physical parent within each seed; parents are reused across seeds"}
+        source = directory / "summary.json"
+        self.put(source, review)
+        stack, values = [review], 0
+        while stack:
+            value = stack.pop()
+            values += 1
+            if isinstance(value, dict):
+                stack.extend(value.values())
+            elif isinstance(value, list):
+                stack.extend(value)
+        self.assertGreater(values, 100000)
+        self.assertLess(source.stat().st_size, export.MAX_JSON)
+        before = hashlib.sha256(source.read_bytes()).hexdigest()
+        source.chmod(0o400)
+        directory.chmod(0o500)
+        index = export.import_runs(self.root, [], [directory], "runs/ssmo-full-review-export")
+        attempt = self.root / index["attempts"][0]["path"]
+        summary = self.load(attempt / "summary.json")
+        imported = summary["results"]["imported-review"]
+        self.assertEqual(summary["state"], "COMPLETED")
+        self.assertEqual(len(imported["method_records"]), 6)
+        self.assertEqual(len(imported["endpoint_records"]), 36)
+        self.assertEqual({row["seed"] for row in imported["method_records"].values()}, {17, 29, 43})
+        self.assertTrue(all(row["total"]["physical_parents"] == 62 for row in imported["method_records"].values()))
+        retained = imported["endpoint_records"]["ssmo-pilot-seed29.measure.classical_front_regression.directions3-queries6"]
+        self.assertAlmostEqual(retained["warm_learned_over_control_median"], 11.096, places=12)
+        self.assertEqual(retained["seed"], 29)
+        self.assertEqual(retained["method"], "measure")
+        state = imported["endpoint_records"]["ssmo-pilot-seed43.state_only.exact_front.directions1-queries6"]
+        self.assertAlmostEqual(state["cold_learned_over_control_p90"], 15.536, places=12)
+        self.assertEqual(state["seed"], 43)
+        self.assertEqual(state["method"], "state_only")
+        cohort = imported["method_records"]["ssmo-pilot-seed29.measure"]["cohorts"]["audit/shock"]
+        self.assertEqual(cohort["physical_parents"], 1)
+        self.assertEqual(cohort["failed"], 1)
+        self.assertAlmostEqual(cohort["absolute_error_max"], 0.01129, places=12)
+        self.assertNotIn("paired_records", json.dumps(imported))
+        self.assertNotIn("raw_endpoint_records", json.dumps(imported))
+        self.assertEqual(hashlib.sha256(source.read_bytes()).hexdigest(), before)
+        receipts = self.load(self.root / "runs/ssmo-full-review-export/sources.json")["inputs"]
+        self.assertEqual(receipts[str(source.relative_to(self.root))]["sha256"], before)
+        bundle = export.planning(self.root, [attempt], [], "runs/ssmo-full-review-export/planning.json")
+        self.assertEqual(len(bundle["history"]), 1)
+        self.assertLessEqual((attempt / "summary.json").stat().st_size, 256 << 10)
+        self.assertLessEqual((attempt / "run.json").stat().st_size, 64 << 10)
+        export.encoded(bundle)
+
+    def test_native_value_limits_remain_strict_for_planning_reads_and_writes(self):
+        native = {"values": [0] * 100001}
+        path = self.root / "runs" / "oversized-native-planning.json"
+        self.put(path, native)
+        self.assertLess(path.stat().st_size, export.MAX_PLANNING)
+        with self.assertRaises(ValueError):
+            export.read_json(self.root, path, limit=export.MAX_PLANNING)
+        with self.assertRaises(ValueError):
+            export.write_json(self.root, "reports/oversized-planning.json", native)
+        self.assertFalse((self.root / "reports/oversized-planning.json").exists())
+        with self.assertRaises(ValueError):
+            export.encoded(native)
+
+    def test_cli_selects_one_recorded_evaluation_path_and_rejects_empty_selection(self):
+        self.fixture("evaluate")
+        attempt = self.imports()[0]
+        before = (attempt / "run.json").read_bytes()
+        stdout, stderr = io.StringIO(), io.StringIO()
+        with redirect_stdout(stdout), redirect_stderr(stderr):
+            code = export.main(["list", "--export-dir", "runs/ssmo-export-one", "--stage", "evaluate",
+                                "--first", "--absolute"])
+        self.assertEqual(code, 0)
+        self.assertEqual(stdout.getvalue().strip(), str(attempt))
+        self.assertEqual(stderr.getvalue(), "")
+        with redirect_stdout(io.StringIO()), redirect_stderr(stderr):
+            code = export.main(["list", "--export-dir", "runs/ssmo-export-one", "--stage", "train", "--first"])
+        self.assertEqual(code, 2)
+        self.assertIn("no indexed attempts", stderr.getvalue())
+        self.assertEqual((attempt / "run.json").read_bytes(), before)
+
+    def test_cli_incomplete_export_empty_attempt_and_shell_alias_diagnostics(self):
+        partial = self.root / "runs/ssmo-partial"
+        partial.mkdir()
+        retained = partial / "accounting.txt"
+        retained.write_text("retained accounting evidence\n")
+        for command in ("list", "planning"):
+            with self.subTest(command=command):
+                stderr = io.StringIO()
+                with redirect_stdout(io.StringIO()), redirect_stderr(stderr):
+                    code = export.main([command, "--export-dir", str(partial)])
+                self.assertEqual(code, 2)
+                self.assertIn("incomplete Tower export", stderr.getvalue())
+                self.assertIn("index.json is missing", stderr.getvalue())
+        self.assertFalse((self.root / "reports/planning.json").exists())
+        self.assertEqual(retained.read_text(), "retained accounting evidence\n")
+        stderr = io.StringIO()
+        with redirect_stdout(io.StringIO()), redirect_stderr(stderr):
+            code = export.main(["validate", "--attempt-dir", ""])
+        self.assertEqual(code, 2)
+        self.assertIn("attempt directory is empty", stderr.getvalue())
+        self.fixture()
+        attempt = self.imports()[0]
+        for command in ("validate", "launch"):
+            with self.subTest(command=command), mock.patch.object(export.shutil, "which", return_value=None):
+                stderr = io.StringIO()
+                with redirect_stdout(io.StringIO()), redirect_stderr(stderr):
+                    code = export.main([command, "--attempt-dir", str(attempt)])
+                self.assertEqual(code, 2)
+                self.assertIn("shell aliases/functions are not inherited", stderr.getvalue())
+    def test_source_validation_keeps_finiteness_integer_depth_and_path_diagnostics(self):
+        directory = self.root / "runs" / "ssmo-invalid-source"
+        directory.mkdir()
+        cases = {"duplicate.json": '{"status":"complete","status":"complete"}',
+                 "nan.json": '{"status":"complete","measurement":NaN}',
+                 "overflow.json": '{"status":"complete","measurement":1e400}',
+                 "integer.json": json.dumps({"integer": 1 << 257})}
+        deep = {"status": "complete"}
+        for _ in range(34):
+            deep = {"nested": deep}
+        cases["deep.json"] = json.dumps(deep)
+        for name, raw in cases.items():
+            path = directory / name
+            path.write_text(raw)
+            before = path.read_bytes()
+            with self.subTest(name=name):
+                with self.assertRaisesRegex(ValueError, name.replace(".", r"\.")):
+                    export.read_json(self.root, path)
+                self.assertEqual(path.read_bytes(), before)
+        path = directory / "value-budget.json"
+        self.put(path, {"observations": list(range(20))})
+        with mock.patch.object(export, "MAX_SOURCE_VALUES", 16):
+            with self.assertRaisesRegex(ValueError, r"value-budget\.json"):
+                export.read_json(self.root, path)
 
 
 if __name__ == "__main__":

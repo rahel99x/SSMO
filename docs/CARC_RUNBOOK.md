@@ -30,10 +30,14 @@ git pull --ff-only
 export SSMO_PROJECT_ROOT="$PWD"
 unset SSMO_ROOT
 module load python/3.12.8
+source scripts/carc_env.sh
+ssmo_env
 bash scripts/tower.sh --help
 command -v tower
 
-SSMO_TOWER_EXPORT="runs/ssmo-tower-completed-001"
+SSMO_TOWER_EXPORT="runs/ssmo-tower-completed-002"
+(
+set -euo pipefail
 bash scripts/tower.sh import \
   --run ssmo-pilot-001 \
   --run ssmo-pilot-seed29 \
@@ -43,6 +47,12 @@ bash scripts/tower.sh import \
   --artifact-dir runs/ssmo-pilot-cost-review-001 \
   --output-dir "$SSMO_TOWER_EXPORT" \
   --accounting
+
+bash scripts/tower.sh planning \
+  --export-dir "$SSMO_TOWER_EXPORT" \
+  --output "$SSMO_TOWER_EXPORT/planning.json"
+bash scripts/tower.sh list --export-dir "$SSMO_TOWER_EXPORT"
+)
 ```
 
 Expected: a fresh export with one attempt per recorded job plus three review
@@ -53,33 +63,40 @@ unavailable. Without accounting, original application evidence determines
 known outcomes and missing scheduler/resource facts remain unknown. Existing
 destinations are refused; retain partial failures and choose another suffix.
 No raw JSONL is copied or expanded, and original checkpoints/source stay intact.
+The subshell stops on the first error. In the reported failed `001` export,
+the importer applied Tower's 100,000-value output budget to a full scientific
+source before compaction. The corrected reader permits bounded scientific
+inputs up to 32 MiB/two million values, then reduces them into the unchanged
+Tower output limits. Preserve `ssmo-tower-completed-001`; retry with `002` or
+another fresh name. An export is complete only when `index.json` exists.
 
-Build planning history from only this export and choose its first evaluation
-attempt explicitly from the index:
+After the block succeeds, select its first recorded evaluation attempt and
+invoke Tower in the same interactive shell. This supports the user's existing
+`tower='_slurm_tower'` alias. All paths passed to Tower are absolute, including
+the contract/config/planning files, so an alias that changes directory still
+uses the SSMO files:
 
 ```bash
-bash scripts/tower.sh planning \
-  --export-dir "$SSMO_TOWER_EXPORT" \
-  --output reports/planning.json
-bash scripts/tower.sh list --export-dir "$SSMO_TOWER_EXPORT"
-
-SSMO_TOWER_ATTEMPT="$SSMO_PROJECT_ROOT/$(
-  .venv/bin/python -B -S - "$SSMO_TOWER_EXPORT/index.json" <<'PY'
-import json
-import sys
-from pathlib import Path
-index = json.loads(Path(sys.argv[1]).read_text())
-print(next(row["path"] for row in index["attempts"] if row["stage"] == "evaluate"))
-PY
-)"
-bash scripts/tower.sh validate --attempt-dir "$SSMO_TOWER_ATTEMPT"
-bash scripts/tower.sh launch \
-  --attempt-dir "$SSMO_TOWER_ATTEMPT" \
-  --planning-file reports/planning.json
+if SSMO_TOWER_ATTEMPT="$(
+  bash scripts/tower.sh list --export-dir "$SSMO_TOWER_EXPORT" \
+    --stage evaluate --first --absolute
+)"; then
+  if tower run validate \
+    "$SSMO_PROJECT_ROOT/.tower/contracts/outputs.v1.json" \
+    "$SSMO_TOWER_ATTEMPT"; then
+    tower --profile carc \
+      --config "$SSMO_PROJECT_ROOT/.tower/config.json" \
+      --workdir "$SSMO_TOWER_ATTEMPT" \
+      --tab research --research-view experiment \
+      --planning-file "$SSMO_PROJECT_ROOT/$SSMO_TOWER_EXPORT/planning.json"
+  fi
+fi
 ```
 
 Expected: native Tower contract validation succeeds, and the Experiment view
-shows the selected attempt's imported observations and scientific results.
+shows the selected attempt's imported numeric observations. Inspect indexed
+summary/analytics JSON in Artifacts or grouped Logs for scientific findings;
+Tower 2.3.1 does not chart arbitrary nested `results` objects.
 The native Log view uses exact grouped scheduler, application, training and
 science paths when its selected job matches the inventory's actual `job_id`.
 Imported attempts do not reconstruct separate application captures; original
@@ -88,14 +105,15 @@ export time: they are not reconstructed live curves or historical ETAs. The
 three-seed review preserves per-seed accuracy and paired cost ratios. A file
 contract pass is operational evidence; the pilot's complete weak gate still
 fails. Three seeds do not justify calibrated resource predictions or scaling
-claims. If `reports/planning.json` already exists, choose another contained
-filename and pass that filename to `launch`; deliberate replacement requires
-`planning --replace`.
+claims. Planning is written inside the fresh export to avoid replacing an
+earlier report. Deliberate replacement requires `planning --replace`.
 
 Share the import/planning counts, the native validation result and any missing
 log warning. A schema check in the cloud does not establish this native CARC
-check. If `tower` is absent from PATH, activate your existing installation and
-repeat only `validate`/`launch`; no SSMO dependency installation is needed.
+check. A shell alias/function is available only in its defining shell; Python
+cannot discover it with executable PATH lookup. The `tower.sh validate/launch`
+helpers remain available when Tower is an executable on PATH. With an alias,
+use the native commands above. Do not recreate or modify the Tower installation.
 
 For a future authorized new pipeline, reporting is automatic. Its concrete
 attempts live in `runs/<run-id>/tower/`; pass the chosen absolute directory to

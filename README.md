@@ -127,6 +127,8 @@ boundaries or a two-second cadence; optional allocated-device GPU traces use
 
 Use `bash scripts/tower.sh import` for completed pilots and reviews, then
 `planning`, `list`, `validate` and `launch` with your existing Tower installation.
+For a shell alias/function, use the runbook's direct native Tower commands;
+the Python launcher requires an executable on PATH.
 The [next Tower runbook steps](docs/CARC_RUNBOOK.md#view-completed-evidence-in-tower)
 use the completed three-seed pilots without rerunning experiments. Imports
 preserve each actual job and initialization separately, keep unknown measurements

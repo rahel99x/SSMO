@@ -25,6 +25,9 @@ from .runtime import project_root
 
 MAX_JSON = 32 << 20  # Existing project summaries, not Tower interchange files.
 MAX_PLANNING = 1 << 20
+MAX_SOURCE_VALUES = 2_000_000
+MAX_NATIVE_VALUES = 100_000
+MAX_JSON_DEPTH = 32
 MAX_ATTEMPTS = 256
 JOB_ID = re.compile(r"[0-9]+(?:_[0-9]+)?")
 IDENT = re.compile(r"[A-Za-z0-9][A-Za-z0-9_.-]{0,127}")
@@ -58,19 +61,34 @@ def plain_path(root: Path, value: str | Path, *, exists=False) -> Path:
     return path
 
 
-def encoded(value, limit=MAX_PLANNING):
-    stack, count = [(value, 0)], 0
+def validate_json(value, *, max_values=MAX_NATIVE_VALUES):
+    # Iterators keep validation storage proportional to depth, rather than
+    # copying every element of a large scientific record into a second stack.
+    stack, count = [(iter((value,)), 0)], 0
     while stack:
-        child, depth = stack.pop()
+        children, depth = stack[-1]
+        try:
+            child = next(children)
+        except StopIteration:
+            stack.pop()
+            continue
         count += 1
-        if depth > 32 or count > 100000:
-            raise ValueError("JSON exceeds depth/value budget")
+        if depth > MAX_JSON_DEPTH:
+            raise ValueError(f"JSON depth {depth} exceeds {MAX_JSON_DEPTH}-level budget")
+        if count > max_values:
+            raise ValueError(f"JSON value count {count} exceeds {max_values}-value budget")
         if isinstance(child, dict):
-            stack.extend((v, depth + 1) for v in child.values())
+            stack.append((iter(child.values()), depth + 1))
         elif isinstance(child, list):
-            stack.extend((v, depth + 1) for v in child)
+            stack.append((iter(child), depth + 1))
         elif isinstance(child, int) and not isinstance(child, bool) and child.bit_length() > 256:
             raise ValueError("JSON integer exceeds bounded reader profile")
+        elif isinstance(child, float) and not math.isfinite(child):
+            raise ValueError("nonfinite JSON")
+
+
+def encoded(value, limit=MAX_PLANNING):
+    validate_json(value)
     raw = (json.dumps(value, sort_keys=True, separators=(",", ":"), allow_nan=False) + "\n").encode()
     if len(raw) > limit:
         raise ValueError(f"JSON exceeds {limit} byte budget")
@@ -107,11 +125,17 @@ def read_json(root, value, *, limit=MAX_JSON, receipts=None):
     raw = read_bytes(root, value, limit=limit)
     if receipts is not None:
         receipts[str(plain_path(root, value).relative_to(root))] = {"sha256": hashlib.sha256(raw).hexdigest(), "bytes": len(raw)}
-    obj = json.loads(raw, object_pairs_hook=pairs,
-                     parse_constant=lambda token: (_ for _ in ()).throw(ValueError("nonfinite JSON")))
-    encoded(obj, limit)
-    if not isinstance(obj, dict):
-        raise ValueError("JSON object required")
+    try:
+        obj = json.loads(raw.decode("utf-8"), object_pairs_hook=pairs,
+                         parse_constant=lambda token: (_ for _ in ()).throw(ValueError("nonfinite JSON")))
+        # Full scientific sources are reduced before publication. Applying
+        # Tower's small planning profile here rejects valid completed pilots.
+        # Validate once without serializing the whole input a second time.
+        validate_json(obj, max_values=MAX_SOURCE_VALUES if limit > MAX_PLANNING else MAX_NATIVE_VALUES)
+        if not isinstance(obj, dict):
+            raise ValueError("JSON object required")
+    except (ValueError, UnicodeError, RecursionError) as error:
+        raise ValueError(f"{plain_path(root, value)}: {error}") from error
     return obj
 
 
@@ -632,7 +656,10 @@ def selected_attempts(root, attempt_dirs, export_dirs):
     selected = [plain_path(root, path, exists=True) for path in attempt_dirs]
     for value in export_dirs:
         directory = plain_path(root, value, exists=True)
-        index = read_json(root, directory / "index.json", limit=MAX_PLANNING)
+        index_path = directory / "index.json"
+        if not index_path.exists():
+            raise ValueError(f"incomplete Tower export {directory}: index.json is missing; finish a successful import into a fresh directory before planning/list")
+        index = read_json(root, index_path, limit=MAX_PLANNING)
         if index.get("schema") != "ssmo.tower-export/v1":
             raise ValueError("not an explicit SSMO Tower export index")
         for item in index.get("attempts", []):
@@ -702,6 +729,9 @@ def main(argv=None):
     plan.add_argument("--replace", action="store_true")
     listing = commands.add_parser("list", help="print exact attempt paths from a selected export index")
     listing.add_argument("--export-dir", required=True)
+    listing.add_argument("--stage", help="select attempts with this exact recorded stage")
+    listing.add_argument("--first", action="store_true", help="print only the first matching indexed attempt")
+    listing.add_argument("--absolute", action="store_true", help="print absolute project-contained paths")
     for command in ("launch", "validate"):
         sub = commands.add_parser(command, help="invoke your installed Tower; never install or modify it")
         sub.add_argument("--attempt-dir", required=True)
@@ -720,15 +750,23 @@ def main(argv=None):
                               reference=args.reference, replace=args.replace)
             print(f"SSMO: planning saved {len(result['history'])} distinct attempts: {plain_path(root, args.output)}")
         elif args.command == "list":
-            for path in selected_attempts(root, [], [args.export_dir]):
-                print(path.relative_to(root))
+            attempts = selected_attempts(root, [], [args.export_dir])
+            if args.stage is not None:
+                attempts = [path for path in attempts if read_json(root, path / "run.json", limit=64 << 10)
+                            .get("metadata", {}).get("stage") == args.stage]
+                if not attempts:
+                    raise ValueError(f"no indexed attempts have recorded stage {args.stage!r}")
+            for path in attempts[:1] if args.first else attempts:
+                print(path if args.absolute else path.relative_to(root))
         else:
+            if not args.attempt_dir:
+                raise ValueError("attempt directory is empty; complete the import and select an attempt from index.json first")
             attempt = plain_path(root, args.attempt_dir, exists=True)
             if not (attempt / "run.json").is_file():
                 raise ValueError("choose a concrete Tower attempt directory")
             executable = shutil.which("tower")
             if not executable:
-                raise ValueError("Tower executable is unavailable; activate your existing Tower installation")
+                raise ValueError("Tower executable is unavailable on PATH; shell aliases/functions are not inherited here. Invoke your existing tower alias directly using the absolute commands in docs/CARC_RUNBOOK.md")
             if args.command == "validate":
                 command = [executable, "run", "validate", str(plain_path(root, ".tower/contracts/outputs.v1.json", exists=True)), str(attempt)]
             else:
